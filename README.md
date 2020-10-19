@@ -6,7 +6,7 @@ BaseRTL.DLL - for many common routines (File choosing, loading, saving).
 
 AnyBits.DLL - Math library (Long algorithms; Karatsuba;)
 
-BaseCodecs.DLL - some Base 16,64 conversions; custom Bases 24,41,53,62,75,85,94;
+BaseCodecs.DLL - some Base 10,16,64 conversions; custom Bases 24,41,53,62,75,85,94;
 
 Numeriko.DLL - for play with Prime numbers.
 
