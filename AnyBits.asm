@@ -2752,8 +2752,13 @@ ________________________________________________________________________________
 
 
 main:
-mov eax 1 | ret 0C
+    mov eax 1
+    ret 0C
 
+
+AnyBitsVersion::
+    mov eax 010003
+    ret
 
 
 Proc VAlloc::
