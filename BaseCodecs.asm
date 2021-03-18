@@ -1919,12 +1919,10 @@ ________________________________________________________________________________
 TITLE DecimalConversion
 ____________________________________________________________________________________________
 
-[ updateBitSize | mov edx #1 | mov eax #2
-    call 'AnyBits.GetEffectiveHighBitSz32' | mov #2 eax ]
-[ updateByteSize | mov edx #1 | mov eax #2 | shl eax 3
-    call 'AnyBits.GetEffectiveHighBitSz32' | shr eax 3 | mov #2 eax ]
+AnyBits2Decimals::
+    cmp D$esp+0C 128 | ja AnyBits2Decimals9x
 
-Proc AnyBits2Decimal:: ;ritern sLen
+Proc AnyBits2Decimals1x:: ;ritern sLen
  ARGUMENTS @pDecimalString @pBits @nBits
  USES EBX ESI EDI
 
@@ -1955,7 +1953,7 @@ L0: mov eax edi
 EndP
 
 
-Proc AnyBits2DecimalF9x:: ;ritern sLen
+Proc AnyBits2Decimals9x:: ;ritern sLen
  ARGUMENTS @pDecimalString @pBits @nBits
  USES EBX ESI EDI
 
@@ -1990,52 +1988,18 @@ L0: cmp ecx edx | jae L0>
     mov al B$ecx, ah B$edx, B$ecx ah, B$edx al | inc ecx | dec edx | jmp L0<
 L0: mov eax edi
 EndP
-
-
-;;
-Proc AnyDecimal2Bits0: ;returns nBits 32-aligned
- ARGUMENTS @pBits @nBits @pDecimalString
- USES EBX ESI EDI
-
-; nBits must be DWORD (32bit) aligned
-    mov eax 0 | mov ecx D@nBits | mov ebx ecx | test ecx 00_11111 | jne P9>> | shr ecx 5 | je P9>>
-    mov edi D@pBits | shr ebx 3 | add ebx edi | CLD | rep stosd
-    mov esi D@pDecimalString
-; first char
-L0: movzx ecx B$esi | inc esi | sub ecx 030 | cmp ecx 9 | ja L9>
-    cmp ecx 0 | je L0< ; skip 1st 0s
-    mov edi D@pBits | mov D$edi ecx
-; next chars
-L0:
-    movzx ecx B$esi | inc esi | sub ecx 030 | cmp ecx 9 | ja L9>
-; Bits mul 10, from upper dwords must
-    lea edi D$ebx-4
-L4:
-    mov eax D$edi | test eax eax | je L1>
-    mov edx 10 | mul edx | mov D$edi eax
-    test edx edx | je L1> ;jno L1> ;
-    lea eax D$edi+4 | cmp eax ebx | jae B0> | add D$eax edx | jnc L1>
-L2: add eax 4 | cmp eax ebx | jae B0> | add D$eax 1 | jc L2<
-
-L1: sub edi 4 | cmp edi D@pBits | jae L4<
-
-; Bits+ecx
-    mov edi D@pBits | add D$edi ecx | jnc L0<
-L2: add edi 4 | cmp edi ebx | jae B0> | add D$edi 1 | jc L2<
-    jmp L0<
-
-; overflow
-B0: mov eax 0 | jmp P9>
-L9: cmp D$ebx-4 0 | jne L0> | sub ebx 4 | cmp ebx D@pBits | ja L9< | add ebx 4 ; min=4
-L0: sub ebx D@pBits | mov eax ebx | shl eax 3 ; bits
-EndP
-;;
+;
+;
+;
+;
+AnyDecimals2Bits::
+    cmp D$esp+08 128 | ja AnyDecimals2Bits9x
 
 ; returns nBits actual size (32bit-aligned) or NULL on Error.
 ; if no ERROR, ECX = processed chars
 ; nBits must be DWORD (32bit) aligned
 ; Bits_buffer will be cleaned, so it can be dirty
-Proc AnyDecimal2Bits::
+Proc AnyDecimals2Bits1x::
  ARGUMENTS @pBits @nBits @pDecimalString
  Local @upBorder
  USES EBX ESI EDI
@@ -2091,7 +2055,7 @@ EndP
 ; returns Bits size (32bit-aligned) or NULL on Error.
 ; nBits must be DWORD (32bit) aligned
 ; Bits_buffer will be cleaned, so it can be dirty
-Proc AnyDecimal2BitsF9x::
+Proc AnyDecimals2Bits9x::
  ARGUMENTS @pBits @nBits @pDecimalString
  Local @upBorder @lastMUL
  USES EBX ESI EDI
@@ -2243,6 +2207,8 @@ EndP
 
 
 
+
+
 ; returns EAX=nBitsInteger EDX=nBitsFractional (32bit-aligned) ; on Error EAX=0; ECX=0-1 on overflow
 Proc AnyRationalDecimal2RationalBits::
  ARGUMENTS @pBits @nBits @pDecimalString
@@ -2258,7 +2224,7 @@ Proc AnyRationalDecimal2RationalBits::
 L0: inc esi | movzx ecx B$esi | sub ecx 030 | cmp ecx 9 | jbe L0<
     cmp B$esi '.' | je L0>
 ; no DOT? pass to integer conversion
-L1: call AnyDecimal2Bits D@pBits D@nBits D@pDecimalString | sub edx edx | jmp P9>>
+L1: call AnyDecimals2Bits D@pBits D@nBits D@pDecimalString | sub edx edx | jmp P9>>
 
 ; scan after DOT until numbers end
 L0: lea ebx D$esi+1
@@ -2272,25 +2238,27 @@ L0: dec esi | cmp ebx esi | ja L1< ;
     cmp ecx 0-1 | je B0>> | jmp B1>>
 ; now Div on 10 EBX times
 L0: mov D@nBitsFractional eax
-; move up
-    mov eax ebx | sub edx edx | mov ecx 9 | DIV ecx | cmp edx 0 | CMC | adc eax 0 | SHL eax 5
-    mov esi eax | add esi D@nBitsFractional
-    call 'AnyBits.AnyBitsShiftLeft' D@pBits esi eax | test eax eax | je B1>>
+; move up ; 32bit for every 9 10th
+    mov eax ebx | sub edx edx | mov ecx 9 | DIV ecx | cmp edx 0 | SETNE DL | add eax edx | SHL eax 5
+    mov esi eax | mov eax D@nBitsFractional | mov D@nBitsFractional esi | add esi eax
+    cmp esi D@nBits | ja B0>>
+    call DwordsShiftLeft D@pBits esi D@nBitsFractional | test eax eax | je B1>>
     jmp L1>
 L0:
-    call 'AnyBits.AnyBitsDiv32Bit' D@pBits esi 1000000000 | test eax eax | je B1>>
+    call AnyBitsDiv32Bit D@pBits esi 1000000000 | test eax eax | je B1>>
 L1: sub ebx 9 | jge L0<
     add ebx 9 | je L1>
     mov eax 1, ecx 10
 L0: MUL ecx | dec ebx | jne L0<
-    call 'AnyBits.AnyBitsDiv32Bit' D@pBits esi eax | test eax eax | je B1>
-L1: UpdateBitSize D@pBits esi
+    call AnyBitsDiv32Bit D@pBits esi eax | test eax eax | je B1>
+L1: ;UpdateBitSize D@pBits esi
 ; move back if lowest are 0s
     mov ecx esi | sub eax eax | mov edi D@pBits | SHR ecx 5 | CLD | REPE SCASD
-    sub edi 4 | sub edi D@pBits | SHL edi 3
-    call 'AnyBits.AnyBitsShiftRight' D@pBits esi edi | test eax eax | je B1>
-    UpdateBitSize D@pBits esi | mov D@nBitsFractional esi | sub D@nBits esi | SHR esi 3 | add esi D@pBits
-    call AnyDecimal2Bits esi D@nBits D@pDecimalString | test eax eax | jne L0>
+    sub edi 4 | sub edi D@pBits | je L0> | SHL edi 3
+    call DwordsShiftRight D@pBits esi edi | test eax eax | je B1>
+    sub D@nBitsFractional edi
+L0: mov esi D@nBitsFractional | sub D@nBits esi | SHR esi 3 | add esi D@pBits
+    call AnyDecimals2Bits esi D@nBits D@pDecimalString | test eax eax | jne L0>
     cmp ecx 0-1 | je B0> | jmp B1>
 L0: UpdateBitSize esi D@nBits | jmp L9>
 
@@ -2311,7 +2279,7 @@ Proc AnyRationalBits2RationalDecimal::
  USES EBX
 
     mov eax D@nBitsFractional | shr eax 3 | add eax D@pBits
-    call AnyBits2Decimal D@pDecimalString, eax, D@nBitsIntegral | test eax eax | je P9>
+    call AnyBits2Decimals D@pDecimalString, eax, D@nBitsIntegral | test eax eax | je P9>
     mov edx D@pDecimalString | mov B$edx+eax '.' | inc eax | mov ebx eax
     add edx eax
     call AnyFractionalBits2DecimalFraction edx, D@pBits, D@nBitsFractional | test eax eax | je P9>
@@ -2335,6 +2303,8 @@ L0: cmp D$ebx 0 | jne L0> | add ebx 4
     mov B$edi 030 | inc edi | jmp L9> ; 1 zero for fraction Null case
 B0: sub eax eax | jmp P9> ; params ERROR case
 
+; for each 32bit 10decimal enough or will be too long fraction. so you can control precision.
+L0: mov ecx D@upBorder | sub ecx ebx | SHR ecx 1 | lea ecx D$ecx*4+ecx
 L0: mov esi D@upBorder
 ; MUL from upper dwords
     mov eax D$esi-4 | mov edx 10 | mul edx | mov D$esi-4 eax
@@ -2346,6 +2316,7 @@ L3: sub esi 4 | cmp ebx esi | je L4>
 L2: add eax 4 | add D$eax 1 | jc L2< ; BIG-ADC ; no need upBorder check > sizes checked
 L1: jmp L3<
 L4: cmp D@upBorder ebx | je L9> ; end on all zero bits
+    dec ecx | je L9> ; or end on calculated optimum
     cmp D$ebx 0 | jne L0<
     add ebx 4 | jmp L4<
 
@@ -2354,6 +2325,102 @@ L9: mov B$edi 0 | sub edi D@pDecimal | mov eax edi
 EndP
 
 ____________________________________________________________________________________________
+
+; copied funcs from AnyBits for Dll independency
+
+[ updateBitSize | mov edx #1 | mov eax #2
+    call GetEffectiveHighBitSz32 | mov #2 eax ]
+[ updateByteSize | mov edx #1 | mov eax #2 | shl eax 3
+    call GetEffectiveHighBitSz32 | shr eax 3 | mov #2 eax ]
+
+; EAX=BITsz EDX=pBITs
+GetEffectiveHighBitSz32::
+    shr eax 3 | add eax edx
+L0: sub eax 4 | cmp eax edx | jb L0> ; AnyBits is 0 -> 32BIT.
+    cmp D$eax 0 | je L0<
+    add eax 4 | sub eax edx | shl eax 3
+    ret
+L0: mov eax 32 | ret
+
+
+; returns &FALSE on params_Error, else: eax=&TRUE, edx=Reminder
+; Parameters Must be 32Bit aligned
+; Quotent becomes Divident
+Proc AnyBitsDiv32Bit:
+ ARGUMENTS @pAnyBits @nBits @Bit32
+ USES ESI EDI
+
+; AnyBitNum must be DWORD (32bit) aligned; Divisor can't be 0;
+    sub eax eax
+    mov edx D@nBits | test edx 00_11111 | jne P9> | shr edx 3 | je P9>
+    mov ecx D@Bit32 | test ecx ecx | je P9>
+
+    mov esi D@pAnyBits | mov edi esi | lea esi D$esi+edx-4
+
+L0: sub edx edx | mov eax D$esi | test eax eax | jne L3>
+    sub esi 4 | cmp esi edi | jae L0< | jmp L0> ; Quotent is 0
+L1:
+    mov eax D$esi
+L3:
+    div ecx | mov D$esi eax
+    sub esi 4 | cmp esi edi | jae L1<
+
+L0: mov eax 1; EDX=Mod32
+EndP
+
+
+; Shifting Dwords Left
+; nBitsShift < nBits
+; nBits => 64
+Proc DwordsShiftLeft:
+ ARGUMENTS @pAnyBits @nBits @nBitsShift
+ USES EBX ESI EDI
+
+    sub eax eax
+    mov edi D@nBits | test edi 00_11111 | jne P9>
+    cmp edi 64 | jb P9> ; hey! not less then 64bit
+    mov edx D@nBitsShift | test edx 00_11111 | jne P9> ; 32bit align
+    cmp edx edi | jae P9> ; nBitsShift < nBits
+    cmp edx 0 | je L9>
+
+    shr edx 3 | shr edi 3
+    mov ebx D@pAnyBits | add edi ebx ; EBX will LowBorder ; EDI is at UpBorder
+    mov esi edi | sub esi edx ; esi start pos
+; dword moving, then wiping of below bits
+L3: mov ecx esi | sub ecx ebx | sub esi 4 | sub edi 4 | SHR ecx 2 | STD | REP MOVSD | CLD
+    add edi 4 | mov ecx edi | mov edi ebx | sub ecx ebx | jle L9>
+    sub eax eax | SHR ecx 2 | REP STOSD
+
+L9: mov eax 1
+EndP
+
+; Shifting Dwords Right
+; nBitsShift < nBits
+; nBits => 64
+Proc DwordsShiftRight:
+ ARGUMENTS @pAnyBits @nBits @nBitsShift
+ USES EBX ESI EDI
+
+    sub eax eax
+    mov esi D@nBits | test esi 00_11111 | jne P9>
+    cmp esi 32 | jb P9> ; hey! not less then 64bit
+    mov edx D@nBitsShift | test edx 00_11111 | jne P9> ; 32bit align
+    cmp edx esi | jae P9> ; nBitsShift < nBits
+    cmp edx 0 | je L9>
+
+    shr edx 3 | shr esi 3
+    mov edi D@pAnyBits | mov ebx edi | add ebx esi ; EBX will UpBorder, EDI is at LowBorder
+    mov esi edi | add esi edx ; esi start pos
+; dword moving, then wiping of upper bits
+L3: mov ecx ebx | sub ecx esi | SHR ecx 2 | CLD | REP MOVSD
+    mov ecx ebx | sub ecx edi | jle L9>
+    sub eax eax | SHR ecx 2 | REP STOSD
+
+L9: mov eax 1
+EndP
+
+
+
 TITLE DLLMAIN
 
 [hInstance: 0]

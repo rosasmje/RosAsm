@@ -1327,7 +1327,7 @@ Proc doBin2Dec:
 call SetStartTick
 ;RDTSC | push edx, eax
     mov eax D@inSz | ALIGN_ON 4 eax | shl eax 3
-    call 'BaseCodecs.AnyBits2DecimalF9x', D@outMem, D@inMem, eax | test eax eax | je @BM
+    call 'BaseCodecs.AnyBits2Decimals', D@outMem, D@inMem, eax | test eax eax | je @BM
     mov D@outSz eax
 ;RDTSC | pop ecx | sub eax ecx | pop ecx | sbb edx ecx | push edx, eax | DBGBP
 call SetEndTickReport
@@ -1352,7 +1352,7 @@ L0:
 
 call SetStartTick
     mov eax D@outSz | shl eax 3
-    call 'BaseCodecs.AnyDecimal2BitsF9x', D@outMem, eax, D@inMem | test eax eax | je @BM
+    call 'BaseCodecs.AnyDecimals2Bits', D@outMem, eax, D@inMem | test eax eax | je @BM
     SHR eax 3 | mov D@outSz eax
 call SetEndTickReport
 
@@ -1364,11 +1364,12 @@ EndP
 
 Proc doRationalDecimal2RationalBits:
  cLocal @outSz @outMem @inSz @inMem
-
+ USES edi
     call ChooseAndLoadFileA | test eax eax | je P9>>
     mov D@inMem eax, D@inSz edx
 DBGBP
-    mov eax edx, edx 5, ecx 12 | mul edx | div ecx | adc eax 4
+    mov eax '.' | mov edi D@inMem | mov ecx edx | REPNE SCASB | add edx ecx
+    mov eax edx, edx 5, ecx 12 | mul edx | div ecx | add eax 4
 L0:
     ALIGN_ON 4 eax
     mov D@outSz eax
@@ -1438,6 +1439,7 @@ L1: cmp esi D@inMemEnd | jb L0<
 @BM:
     call VFree D@outMem | call VFree D@inMem
 EndP
+
 
 Proc OnDecimals2Bytes:
  cLocal @outSz @outMem @inSz @inMem
@@ -1638,7 +1640,7 @@ Proc OnOwords2Decimals:
     call VAlloc D@outSz | mov D@outMem eax | test eax eax | je @BM
 
     mov edi D@outMem, esi D@inMem | jmp L1>
-L0: call 'BaseCodecs.AnyBits2Decimal' edi esi 128 | test eax eax | je @BM
+L0: call 'BaseCodecs.AnyBits2Decimals' edi esi 128 | test eax eax | je @BM
     add edi eax | mov B$edi 020 | inc edi | add esi 16
 L1: cmp esi D@inMemEnd | jb L0<
 
@@ -1667,7 +1669,7 @@ Proc OnDecimals2Owords:
 L0: inc esi | cmp esi ebx | jae L1>
     movzx eax B$esi | sub eax 030 | cmp eax 9 | ja L0<
 
-    call 'BaseCodecs.AnyDecimal2Bits' edi 128 esi | test eax eax | je L1>
+    call 'BaseCodecs.AnyDecimals2Bits' edi 128 esi | test eax eax | je L1>
     add edi 16 | add esi ecx | jmp L0<
 L1: mov eax edi | sub eax D@outMem
     mov D@outSz eax
