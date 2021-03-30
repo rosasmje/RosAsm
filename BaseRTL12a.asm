@@ -328,8 +328,9 @@ Main: ;call MULspeedTest ;MULDIVtest ;shifttest;call Rotetebytesttest
     call 'Kernel32.GetModuleHandleA', 0 | mov D$hInstance eax
     call 'Kernel32.GetVersion' | mov D$winver eax
     call 'Kernel32.IsDebuggerPresent' | mov D$isDBG eax
-    call 'AnyBits.AnyBitsVersion' | cmp eax 010003 | jne exito
-    call 'BaseCodecs.BaseCodecsVersion' | cmp eax 010003 | jne exito
+    call 'AnyBits.AnyBitsVersion' | cmp eax 010003 | jb exito
+    call 'BaseCodecs.BaseCodecsVersion' | cmp eax 010003 | jb exito
+    call 'BaseRTL.BaseRTLVersion' | cmp eax 010003 | jb exito
 ;call doRationalBits2RationalDecimal | call 'Kernel32.ExitProcess' &NULL | ret | L0:
 ;call do2P1MTFAnyBitMTFactorFunnyBL; jmp ktest;AnyBitsSQ2Test;jmp L0> | call doLLTestExponent |
 ;call 'Kernel32.ExitProcess' &NULL | ret | L0:
@@ -3048,117 +3049,30 @@ ThreadAbort:
 
 GetTimeTick: jmp 'Kernel32.GetTickCount'
 
-
-
-Proc dumpStartTime:
-  USES EDI
-
-    call InitLogFile | test eax eax | je P9>
-
-    mov edi pReportBuffer
-    mov eax 'Star' | stosd
-    mov eax 't:  ' | stosd
-    call 'BaseRTL.GetCurrentTime2String' EDI | add edi eax | mov eax 0A0D | stosw | mov B$edi 0
-    call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0,  pReportBuffer
-    sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
-    call FlushLogBuffer
-EndP
-
-Proc dumpEndTime:
-  USES EDI
-
-    call InitLogFile | test eax eax | je P9>
-
-    mov edi pReportBuffer
-    mov eax 'End:' | stosd
-    mov eax ' ' | stosb
-    call 'BaseRTL.GetCurrentTime2String' EDI | add edi eax | mov eax 0A0D | stosw | mov B$edi 0
-    call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, pReportBuffer
-    sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
-    call FlushLogBuffer
-EndP
 ;
-[<16 pOutputBuffer: D$ 0 pOutBufCurPos: 0 LogFileHandle: 0
-LogCreateErrStr: "Can't create Log file!
-Try next name?", 0 ]
+[<16 LogFileStruct: D$ LogFileName | LogFileHandle: 0 | LogBuffer: 0 | LogBufferCurPos: 0 ]
 [<4 LogFileName: B$ 'Log_0000.txt',0]
-[LogBufferSize 0F000]
-;[<16 pReportBuffer: B$ ? #256 ]
-;
-Proc InitLogFile:
-    mov eax D$LogFileHandle | test eax eax | jne P9>>
-L0:
-    call 'BaseRTL.FileNameAOpenCreateWriteAppend' LogFileName | mov D$LogFileHandle eax | cmp eax 0 | je E0>
-    call VAlloc LogBufferSize | mov D$pOutputBuffer eax, D$pOutBufCurPos eax | test eax eax | jne P9>
-    call 'BaseRTL.CloseFlushHandle' D$LogFileHandle
-E0:
-    call 'User32.MessageBoxA' D$WindowHandle LogCreateErrStr "ERROR!!" &MB_ICONERROR__&MB_OKCANCEL
-    ;call 'User32.PostQuitMessage' 0 | sub eax eax | call 'Kernel32.ExitThread' 0-1 |
-    cmp eax &IDCANCEL | je L0>
-    lea edx D$LogFileName+4
-    push 0 | mov eax esp
-    call 'BaseCodecs.BaseHex2iBinaryDecode' eax, 2, edx, 4
-    pop eax | add eax 1
-    lea edx D$LogFileName+4 | call 'BaseCodecs.W2H' edx eax
-    jmp L0<<
-L0: sub eax eax
-EndP
 ;
 ;
-Proc AppendToLogFile:
-  ARGUMENTS @pMem @Sz
-    call InitLogFile | test eax eax | je P9>
-    call 'BaseRTL.WriteMem2FileHandle' D$LogFileHandle D@pMem D@Sz
-EndP
 ;
-;
-FlushLogBuffer:
-    mov eax D$pOutBufCurPos | sub eax D$pOutputBuffer | jle L0>
-    cmp eax LogBufferSize | jbe L1> ; ? size damaged?
-    mov eax LogBufferSize
-L1: call AppendToLogFile D$pOutputBuffer eax
-L0: move D$pOutBufCurPos D$pOutputBuffer
-    ret
-;
-;
-Proc AppendToLogBuffer:
-  ARGUMENTS @pMem @Sz
-  USES ESI EDI
-    cmp D$LogFileHandle 0 | je P9>
-    cmp D@Sz LogBufferSize | jb L0>
-L2:
-    call FlushLogBuffer
-    call AppendToLogFile D@pMem D@Sz
-    jmp P9>
-L0:
-    mov eax LogBufferSize
-    add eax D$pOutputBuffer | sub eax D$pOutBufCurPos | ja L0>
-    call FlushLogBuffer
-    mov eax LogBufferSize
-L0: cmp D@Sz eax | jbe L0>
-    call FlushLogBuffer
-L0: mov edi D$pOutBufCurPos, esi D@pMem, ecx D@Sz
-    CLD | REP MOVSB
-    mov D$pOutBufCurPos edi
-EndP
-;
-;
-Proc CloseLogFile:
-  USES ESI EDI
-    sub esi esi | sub edi edi
-    lock xchg D$LogFileHandle esi | lock xchg D$pOutputBuffer edi
-    test esi esi | je P9>
-    mov eax D$pOutBufCurPos | sub eax edi | jbe L0>
-    cmp eax LogBufferSize | jbe L1> ; ? size damaged?
-    mov eax LogBufferSize
-L1: call 'BaseRTL.WriteMem2FileHandle' esi edi eax
-L0: call 'BaseRTL.CloseFlushHandle' esi
-    call VFree edi
-EndP
-;
-;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 TITLE GETFNs
 ____________________________________________________________________________________________
 
@@ -4583,7 +4497,7 @@ Proc PrimesOutFromAnyBits:
     call ChooseAndLoadFileA | test eax eax | je P9>>
     ALIGN_ON 4 edx
     mov D@inMem eax, D@inMemSz edx
-    call InitLogFile
+    call 'BaseRTL.LogFileInit' LogFileStruct | test eax eax | je @BM
 DBGBP
     mov D$JobReporterAddr ReportNumberOnPrimesProgress | and D$NextPrimeForMod 0 | and D$NextPrimeForMod+4 0
     mov edx D@inMemSz | shl edx 3
@@ -4606,7 +4520,7 @@ L2: and D$JobReporterAddr 0
     updateByteSize D@inMem D@inMemSz
     call ChooseAndSaveFileA D@inMem D@inMemSz
 @BM:
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
     call VFree D@inMem
 EndP
 ;
@@ -4620,7 +4534,7 @@ Proc Primes64OutFromAnyBits:
     call ChooseAndLoadFileA | test eax eax | je P9>>
     ALIGN_ON 4 edx
     mov D@inMem eax, D@inMemSz edx
-    call InitLogFile
+    call 'BaseRTL.LogFileInit' LogFileStruct
 DBGBP
     mov D$JobReporterAddr ReportNumberOnPrimesProgress | and D$NextPrimeForMod 0 | and D$NextPrimeForMod+4 0
 L1:
@@ -4636,7 +4550,7 @@ L2: and D$JobReporterAddr 0
     updateByteSize D@inMem D@inMemSz
     call ChooseAndSaveFileA D@inMem D@inMemSz
 @BM:
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
     call VFree D@inMem
 EndP
 ;
@@ -5044,7 +4958,7 @@ DBGBP
     mov D$mB32P eax, D$szB32P edx
 L0:
     mov esi 01965F01 ;2
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
     call 'NUMERIKO.FindNearPrime32FromBit32DiffArray' D$mB32P D$szB32P 1 ESI
     test eax eax | je @BM | mov esi eax, edi ecx
 jmp L0>
@@ -5081,7 +4995,7 @@ L3:
     call VFree D@inMem2P
     mov eax ebx
     push eax
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
     pop eax
 
 EndP
@@ -5090,7 +5004,7 @@ EndP
 L1:
     call 'NUMERIKO.FindNextPrimeDword' esi | test eax eax | je L2>
     mov esi eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 L0:
 ;DBGBP
     call FermatLT2Brpt esi | cmp eax 1 | je L1<
@@ -5100,7 +5014,7 @@ L0:
     jmp L1<
 L2:
     push eax
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
     pop eax
 ;;
 
@@ -5110,7 +5024,7 @@ Proc doFermatNum2Rpt:
 
     call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
     call Input32BitNumber | cmp eax 0 | je @BM | mov esi eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 ;    sub esi 1
 DBGBP
 L0:
@@ -5136,7 +5050,7 @@ call SetEndTick
 L2:
 call SetEndTick
     call dumpNumNmods 1 esi
-@BM: call CloseLogFile
+@BM: call 'BaseRTL.LogFileClose' LogFileStruct
      call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
 ;************************
@@ -5147,7 +5061,7 @@ DBGBP
 
     call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
     call Input32BitNumber | cmp eax 0 | je @BM | mov esi eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 L0:
 ;DBGBP
 cmp D$JobAskToEnd &TRUE | je L2>
@@ -5163,7 +5077,7 @@ call SetStartTick
 L2:
 call SetEndTick
     call dumpNumNmods 1 esi
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
 @BM: call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
 ;
@@ -5180,7 +5094,7 @@ Proc doFermatLT2Rpt64Bits:
 L0:
 ;    call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
     call Input64BitNumber | mov ecx edx | or ecx eax | je @BM | mov esi eax, edi edx
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
     or esi 1
     sub esi 2 | sbb edi 0 ; | jc L2>
 ;    call VAlloc 02000 | test eax eax | je @BM
@@ -5205,8 +5119,7 @@ call SetEndTick
     call reportCurrentNumNmods64 1 esi edi
     cmp D$JobAskToEnd &TRUE | jne L0<
     call dumpNum64Nmods 1 esi edi
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
 @BM: ;call VFree D@inMem2P | call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
 
@@ -5246,7 +5159,7 @@ Proc doFermatLT2MP:
 DBGBP
 
     mov esi 1
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 L0:
 ;DBGBP
     add esi 2 | jc L2>
@@ -5254,7 +5167,7 @@ L0:
     call dumpNumNmods eax esi
     jmp L0<
 L2:
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
 
 EndP
 ;;
@@ -5269,7 +5182,7 @@ DBGBP
     call TryLoadB32primesFile | test eax eax | je P9>>
     mov D$mB32P eax, D$szB32P edx
 L0:
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
     mov ebx 2
 L2:
 call SetStartTick
@@ -5299,8 +5212,7 @@ call SetEndTick
     jmp L2<<
 
 @BM:
-    call dumpStartTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     pop eax
 
 EndP
@@ -5317,7 +5229,7 @@ Proc do2P1MTF32BitPrimes:
     call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
 L0:
     call Input32BitNumber | cmp eax 0 | je @BM | mov ebx eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
 L2:
@@ -5349,8 +5261,7 @@ call SetEndTick
     jmp L2<<
 
 @BM:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
 ;
@@ -5368,7 +5279,7 @@ Proc do2P1MTF64BitPrimes:
 L0:
 ;    call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
     call Input32BitNumber | cmp eax 0 | je @BM | or eax 1 | mov ebx eax; D@Mnum eax,
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
 L2:
@@ -5408,8 +5319,7 @@ call SetEndTick
     jmp L2<<
 
 @BM:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
 ;
@@ -5519,7 +5429,7 @@ Proc do2P1MTFAnyBitFactorFunny0:
 ;L0:
     call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
     call Input32BitNumber | cmp eax 0 | je @BM | or eax 1 | mov D@Mexponent eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
     mov eax D@Mexponent ;| cmp eax 64 | jb @BM
@@ -5578,8 +5488,7 @@ call SetEndTick
 ;    jmp L2<<
 
 @BM:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     call VFree D$SieveBase0 | and D$SieveBase0 0
     call VFree D@m2P
 EndP
@@ -5603,7 +5512,7 @@ L0:
     mov edi p2k, ecx 04 ;D@p2kSz shr ecx 5 |
     CLD | REP STOSD
     move D$p2k D@curpkModLo, D$p2k+4 D@curpkModHi ;| and D@curpkModLo 0 | and D@curpkModHi 0
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 ;    jmp L0>
 
@@ -5691,8 +5600,7 @@ call SetEndTick
     mov edi p2k
     call dumpNumNmods64 D$edi D$edi+4 D@Mexponent
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     call VFree D$SieveBase0 | and D$SieveBase0 0
     call VFree D@mp2k | call VFree D@m2P
 EndP
@@ -5714,7 +5622,7 @@ L0:
     mov edi p2k, ecx 04 ;D@p2kSz shr ecx 5 |
     CLD | REP STOSD
     move D$p2k D@curpkModLo, D$p2k+4 D@curpkModHi
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
     mov ebx D@Mexponent
@@ -5784,8 +5692,7 @@ call SetEndTick
     mov edi p2k
     call dumpNumNmods64 D$edi D$edi+4 D@Mexponent
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     call VFree D@sq2 | call VFree D@sq1 | call VFree D@mp2k
     call VFree D$SieveBase0 | and D$SieveBase0 0
 EndP
@@ -5805,7 +5712,7 @@ L0:
     call TryLoad4GBrangeSieveFile 0 | mov D$SieveBase0 eax | test eax eax | je P9>>
 
     call 'BaseRTL.LoadFileNameA2Mem' modfile | SHL edx 3 | ALIGN_ON 32 edx | mov D@p2k eax, D@p2kSz edx
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
     mov ebx D@Mexponent | add ebx ebx
@@ -5875,8 +5782,7 @@ call SetEndTick
     mov edi D@p2k
     call dumpNumNmods64 D$edi D$edi+4 D@Mexponent
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     mov eax D@p2kSzT | shr eax 3 | call 'BaseRTL.WriteMem2FileNameA' modfile1 D@p2k eax
     call VFree D@sq2 | call VFree D@sq1 | call VFree D@mp2k | call VFree D@p2k
     call VFree D$SieveBase0 | and D$SieveBase0 0
@@ -5899,7 +5805,7 @@ L0:
 L0: cmp D@p2kSz 0 | jne L0>
     call VFree D@p2k | call VAlloc 8 | mov D@p2k eax, D@p2kSz 64 | test eax eax | je P9>>
 L0:
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
     mov ebx D@Mexponent | add ebx ebx
     mov eax D@Mexponent | shr eax 1 | add eax 1 | mov D@Mexp2kp eax
@@ -5951,8 +5857,7 @@ call SetEndTick
     mov edi D@mp2k
     call dumpNumNmods64 D$edi D$edi+4 D@Mexponent
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     mov eax D@p2kSzT | shr eax 3
     call ChooseAndSaveFileA D@mp2k eax
 L0:
@@ -5986,7 +5891,7 @@ L0: mov eax D@pkSz | add eax 32 | mov D@p2kSz eax | shr eax 3
     Align_UP 32 eax | mov D@mp2kSz eax | shr eax 3
     call VAlloc eax | test eax eax | je E0>>
     mov D@mp2k eax
-call dumpStartTime
+call 'BaseRTL.LogDumpStartTime' LogFileStruct
 @Rpt:
 cmp D$JobAskToEnd &TRUE | je @BM1
     call Create2PKSieveAnyFromBaseSieve D@Mexponent D@pk D@pkSz | test eax eax | je @BM1
@@ -6059,8 +5964,7 @@ L0: CLD | mov edi pReportBuffer | mov eax 'next' | STOSD | mov ax 'K.' | STOSW
     jmp @Rpt
 
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     mov eax D@p2kSzT | shr eax 3
     call ChooseAndSaveFileA D@mp2k eax
 E0:
@@ -6092,7 +5996,7 @@ L0: mov eax D@pkSz | add eax 32 | mov D@p2kSz eax | shr eax 3
     Align_UP 32 eax | mov D@mp2kSz eax | shr eax 3
     call VAlloc eax | test eax eax | je E0>>
     mov D@mp2k eax
-call dumpStartTime
+call 'BaseRTL.LogDumpStartTime' LogFileStruct
 @Rpt:
 cmp D$JobAskToEnd &TRUE | je @BM1
     call Create2PKSieveAnyFromBaseSieve D@Mexponent D@pk D@pkSz | test eax eax | je @BM1
@@ -6173,8 +6077,7 @@ L0: CLD | mov edi pReportBuffer | mov eax 'next' | STOSD | mov ax 'R.' | STOSW
     jmp @Rpt
 
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
     mov eax D@p2kSzT | shr eax 3
     call ChooseAndSaveFileA D@mp2k eax
 E0:
@@ -6398,7 +6301,7 @@ L0:
 ;L0:
 ;    call 'BaseRTL.LoadFileNameA2Mem' '2p1277-1D2554' | test eax eax | je @BM1
 
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 ;L0:
 call SetStartTick
 
@@ -6450,8 +6353,7 @@ call SetEndTick
     mov edi p2k1
     call dumpNumNmods64 D$edi D$edi+4 D@Mexponent
 @BM1:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
 ;    call GetSaveFileName | test eax eax | je L0>
 ;    mov eax D@MpDp2dSz | shr eax 3 | call 'BaseRTL.WriteMem2FileNameA' D$pSFileName1 D@MpDp2d eax
 L0:
@@ -6512,7 +6414,7 @@ Proc OnMTFRptTest:
     call Input64BitNumber | mov D$esi eax, D$esi+4 edx
 DBGBP
     mov D@RepCnt 10000
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 call SetStartTick
   mov eax D@Bit32a | add eax eax | mov D$esi eax | sub D$esi 1
 L1:
@@ -6535,12 +6437,11 @@ call SetEndTick
     mov edx esi
     call QwordPtr2Decimal edi edx | add edi eax | mov eax CRLF | STOSW | mov B$edi 0
     sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct pReportBuffer edi
     call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, pReportBuffer
     sub D@RepCnt 1 | jg L1<<
 @BM:
-    call dumpEndTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
 ;    call VFree D@m2P
 EndP
 ;
@@ -6555,7 +6456,7 @@ Proc do2P1Mod32BitPrimes:
     mov D$mB32P eax, D$szB32P edx
 L0:
     call Input32BitNumber | cmp eax 0 | je P9>> | mov ebx eax
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
 
 L2:
@@ -6583,8 +6484,7 @@ call SetEndTick
     jmp L2<<
 
 @BM:
-    call dumpStartTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
 
 EndP
 ;;
@@ -6597,7 +6497,7 @@ Proc do2P1Mod64BitPrimes:
     call TryLoadB32primesFile | test eax eax | je P9>>
     mov D$mB32P eax, D$szB32P edx
 L0:
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
 DBGBP
     mov D@MPrime 2 ;  94137259 ;
 L2:
@@ -6631,8 +6531,7 @@ call SetEndTick
     jmp L2<<
 
 @BM:
-    call dumpStartTime
-    call CloseLogFile
+    call 'BaseRTL.LogDumpEndTime' LogFileStruct
 
 EndP
 ;;
@@ -6654,7 +6553,7 @@ Proc dumpNumNmods:
     mov eax 0A0D | stosw
     mov B$edi 0
     sub edi esi
-    call AppendToLogBuffer esi edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct esi edi
 call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, esi
 call GetTimeTick | mov D$reportPrevTick eax
 EndP
@@ -6677,7 +6576,7 @@ Proc dumpNum64Nmods:
     mov eax 0A0D | stosw
     mov B$edi 0
     sub edi esi
-    call AppendToLogBuffer esi edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct esi edi
 call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, esi
 call GetTimeTick | mov D$reportPrevTick eax
 EndP
@@ -6701,7 +6600,7 @@ Proc dumpNumNmods64:
     mov eax 0A0D | stosw
     mov B$edi 0
     sub edi esi
-    call AppendToLogBuffer esi edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct esi edi
 call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, esi
 call GetTimeTick | mov D$reportPrevTick eax
 EndP
@@ -6718,7 +6617,7 @@ Proc dumpNModsAny:
     mov eax 0A0D | stosw
     mov B$edi 0
     sub edi esi
-    call AppendToLogBuffer esi edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct esi edi
 
 EndP
 
@@ -6845,7 +6744,7 @@ Proc dumpPrimes:
     mov eax 0A0D | stosw
     mov B$edi 0
     sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
+    call 'BaseRTL.LogAppendToBuffer' LogFileStruct pReportBuffer edi
  call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, pReportBuffer
 EndP
 
@@ -6942,14 +6841,14 @@ Proc doLLTestExponent:
     call Input32BitNumber | mov ebx eax | cmp ebx 0 | je P9>>
     call 'NUMERIKO.IsDwordPrime' ebx | test eax eax | jne L0>
     call 'User32.MessageBoxA' D$WindowHandle "Exponent Not a Prime" "Oops!" &MB_ICONINFORMATION
-    sub eax eax | jmp P9>
+    sub eax eax | jmp P9>>
 L0:
 DBGBP
     mov D$JobReporterAddr ReportLLTestExponentProgress
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
     call LLTestExponent ebx
     push eax
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
     pop eax | cmp eax 1 | jne L0>
     call 'User32.MessageBoxA' D$WindowHandle inputNumText "YES! 2P-1!" &MB_ICONINFORMATION
     jmp P9>
@@ -6965,7 +6864,7 @@ EndP
 Proc doLLTestExponentRpt:
  USES EBX
 DBGBP
-    call dumpStartTime
+    call 'BaseRTL.LogDumpStartTime' LogFileStruct
     mov ebx 2
 L1:
     call 'NUMERIKO.FindNextPrimeDword' ebx | test eax eax | je L0>
@@ -6979,7 +6878,7 @@ L1:
     call 'User32.MessageBoxA' D$WindowHandle inputNumText "YES! 2P-1!" &MB_ICONINFORMATION
     jmp L1<
 L0:
-    call CloseLogFile
+    call 'BaseRTL.LogFileClose' LogFileStruct
 
 EndP
 

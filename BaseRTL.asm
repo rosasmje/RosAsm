@@ -279,6 +279,11 @@ ________________________________________________________________________________
 
 [hInstance: 0];[winver: 0]
 
+BaseRTLVersion::
+    mov eax 010003
+    ret
+
+
 Proc Main:
     Arguments @Instance, @Reason, @Reserved
 
@@ -381,13 +386,14 @@ Proc GetTime::
     div ecx | xchg ebx eax | div ecx | mov edx ebx
 EndP
 
+; TimeString format is comparable: "2020/12/31 02:42:08.012", 23 char long.
 Proc GetCurrentTime2String::
  ARGUMENTS @pString
   Structure @SYSTEMTIME 16, @SYSTEMTIME_wYearDis 0,  @SYSTEMTIME_wMonthDis 2, @SYSTEMTIME_wDayOfWeekDis 4,  @SYSTEMTIME_wDayDis 6,
             @SYSTEMTIME_wHourDis 8,  @SYSTEMTIME_wMinuteDis 10,  @SYSTEMTIME_wSecondDis 12,  @SYSTEMTIME_wMillisecondsDis 14
  USES esi edi
-    CLD
     call 'KERNEL32.GetLocalTime', D@SYSTEMTIME
+    CLD
     mov edi D@pString
     movzx eax W@SYSTEMTIME_wYearDis | call Dword2Decimal edi eax | add edi eax | mov al '/' | stosb
     movzx eax W@SYSTEMTIME_wMonthDis | call Dword2Decimal edi eax | add edi eax | cmp eax 2 | je L0>
@@ -407,7 +413,7 @@ L0: mov al ':' | stosb
 L0: mov al '.' | stosb
     movzx eax W@SYSTEMTIME_wMillisecondsDis | call Dword2Decimal edi eax | cmp eax 3 | je L0>
     cmp eax 1 | je L1> | mov DX W$edi | mov B$edi '0' | mov W$edi+1 DX | jmp L0>
-L1: mov DL B$edi | mov W$edi '00' | mov B$edi+2 DL 
+L1: mov DL B$edi | mov W$edi '00' | mov B$edi+2 DL
 L0: mov eax 3 | add eax edi | sub eax D@pString
 EndP
 
@@ -873,6 +879,8 @@ EndP
 
 
 TITLE THREADS
+;
+GetTimeTick: jmp 'Kernel32.GetTickCount'
 
 ;[<16 JobThreadBusy: D$ 0 JobProcAddr: 0 JobReporterAddr: 0 JobThreadhandle: 0 JobThreadPid: 0
 ; JobAskToEnd: 0 JobStartTick: 0 JobEndTick: 0 JobProcParamsCount: 0
@@ -959,107 +967,136 @@ EndP
 ;EndP
 
 
-;;
-Proc dumpStartTime:
-  USES EDI
-
-    call InitLogFile
-L0:
-    mov edi pReportBuffer
-    mov eax 'Star' | stosd
-    mov eax 't:  ' | stosd
-    call GetCurrentTime2String EDI | add edi eax | mov eax 0A0D | stosw | mov B$edi 0
-    call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0,  pReportBuffer
-    sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
-    call FlushLogBuffer
+TITLE LogFile
+____________________________________________________________________________________________
+; will open/create LogFile & write Start time
+Proc LogDumpStartTime::
+ ARGUMENTS @LogStruct
+ USES EBX
+    mov ebx D@LogStruct
+    call LogFileInit ebx | test eax eax | je P9>
+    sub esp 24
+    push 't:  '
+    push 'Star'
+    lea edx D$esp+8
+    call GetCurrentTime2String edx | mov D$esp+eax+8 0A0D | add eax 10 | mov edx esp
+    call LogAppendToBuffer ebx edx eax
+    call LogFlushBuffer ebx
 EndP
-
-Proc dumpEndTime:
-  USES EDI
-
-    call InitLogFile
-L0:
-    mov edi pReportBuffer
-    mov eax 'End:' | stosd
-    mov eax ' ' | stosb
-    call GetCurrentTime2String EDI | add edi eax | mov eax 0A0D | stosw | mov B$edi 0
-    call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, pReportBuffer
-    sub edi pReportBuffer
-    call AppendToLogBuffer pReportBuffer edi
-    call FlushLogBuffer
+; will write End time & close LogFile
+Proc LogDumpEndTime::
+ ARGUMENTS @LogStruct
+ USES EBX
+    mov ebx D@LogStruct
+    call LogFileInit ebx | test eax eax | je P9>
+    sub esp 24
+    push '    '
+    push 'End:'
+    lea edx D$esp+8
+    call GetCurrentTime2String edx | mov D$esp+eax+8 0A0D | add eax 10 | mov edx esp
+    call LogAppendToBuffer ebx edx eax
+    call LogFileClose ebx
 EndP
 ;
-[<16 pOutputBuffer: D$ 0 pOutBufCurPos: 0 LogFileHandle: 0 LogFileName: B$ 'Log.txt',0]
-[LogBufferSize 0F000]
-;[<16 pReportBuffer: B$ ? #256 ]
-;
-Proc InitLogFile:
-    cmp D$LogFileHandle 0 | jne P9>
-    call FileNameAOpenCreateWriteAppend LogFileName | mov D$LogFileHandle eax | cmp eax 0 | je E0>
-    call VAlloc LogBufferSize | mov D$pOutputBuffer eax, D$pOutBufCurPos eax | test eax eax | jne P9>
-    call CloseFlushHandle D$LogFileHandle
+[hUser32: D$ 0 MsgBoxAadr: 0][user32dll: B$ 'USER32.DLL',0 MsgBoxA: 'MessageBoxA',0 ]
+[Log@FileNamePtr 0 | Log@FileHandle 04 | Log@Buffer 08 | Log@BufferCurPos 0C ]
+[LogBufferSize 0F000 ]
+[LogMBoxErTe: B$ "Can't create Log file!
+Try other name?",0 LogMBoxErTl: "ERROR!",0 ]
+; initialize Log File & Buffer
+Proc LogFileInit::
+ ARGUMENTS @LogStruct
+ cLocal @MsgBoxAadr
+ SZLocal 16 @nam
+ USES ebx esi edi
+    sub esi esi
+    mov ebx D@LogStruct
+    cmp D$ebx+Log@FileHandle 0 | jne L9>
+    mov edi D$ebx+Log@FileNamePtr | cmp edi 0 | jle E0>
+L0: call FileNameAOpenCreateWriteAppend edi | mov D$ebx+Log@FileHandle eax | cmp eax 0 | je E0>
+    call VAlloc LogBufferSize | mov D$ebx+Log@Buffer eax, D$ebx+Log@BufferCurPos eax | test eax eax | je E0>
+L9: mov eax 1 | jmp P9>
 E0:
-    call 'User32.MessageBoxA' D$WindowHandle "Can't create log, exiting" "ERROR!!" &MB_ICONERROR
-    call 'User32.PostQuitMessage' 0 | sub eax eax ;| call 'Kernel32.ExitThread' 0-1 |
+    HClose D$ebx+Log@FileHandle | and D$ebx+Log@FileHandle 0 | test esi esi | jne L1>
+    call User32LdrMsgBoxA | mov esi edx | mov D@MsgBoxAadr eax | test eax eax | je E1>
+L1: call D@MsgBoxAadr D$WindowHandle LogMBoxErTe LogMBoxErTl &MB_ICONERROR__&MB_OKCANCEL
+    cmp eax &IDCANCEL | je E1>
+    call GetTime
+    lea edi D@nam
+    mov D$edi 'Log', D$edi+8 '   .', D$edi+12 'txt' | lea edx D$edi+3
+    call 'BaseCodecs.D2H' edx eax
+    jmp L0<<
+E1: call UnloadDLL esi ; once loaded U32, it won't unload..
+    sub eax eax
 EndP
 ;
 ;
-Proc AppendToLogFile:
-  ARGUMENTS @pMem @Sz
-    call InitLogFile
-    call WriteMem2FileHandle D$LogFileHandle D@pMem D@Sz
+Proc LogAppendToFile::
+ ARGUMENTS @LogStruct @pMem @Sz
+ USES ebx
+    mov ebx D@LogStruct
+    call LogFileInit ebx | test eax eax | je P9>
+    call WriteMem2FileHandle D$ebx+Log@FileHandle D@pMem D@Sz
 EndP
 ;
 ;
-FlushLogBuffer:
-    mov eax D$pOutBufCurPos | sub eax D$pOutputBuffer | jle L0>
-    cmp eax LogBufferSize | jbe L1> ; ? size damaged?
-    mov eax LogBufferSize
-L1: call AppendToLogFile D$pOutputBuffer eax
-L0: move D$pOutBufCurPos D$pOutputBuffer
-    ret
-;
-;
-Proc AppendToLogBuffer:
-  ARGUMENTS @pMem @Sz
-  USES ESI EDI
+Proc LogAppendToBuffer::
+ ARGUMENTS @LogStruct @pMem @Sz
+ USES EBX ESI EDI
+    mov ebx D@LogStruct
     cmp D@Sz LogBufferSize | jb L0>
 L2:
-    call FlushLogBuffer
-    call AppendToLogFile D@pMem D@Sz
+    call LogFlushBuffer ebx
+    call LogAppendToFile ebx D@pMem D@Sz
     jmp P9>
 L0:
     mov eax LogBufferSize
-    add eax D$pOutputBuffer | sub eax D$pOutBufCurPos | ja L0>
-    call FlushLogBuffer
+    add eax D$ebx+Log@Buffer | sub eax D$ebx+Log@BufferCurPos | ja L0>
+    call LogFlushBuffer ebx
     mov eax LogBufferSize
 L0: cmp D@Sz eax | jbe L0>
-    call FlushLogBuffer
-L0: mov edi D$pOutBufCurPos, esi D@pMem, ecx D@Sz
-    CLD | REP MOVSB
-    mov D$pOutBufCurPos edi
+    call LogFlushBuffer ebx
+L0: mov edi D$ebx+Log@BufferCurPos, esi D@pMem, ecx D@Sz | CLD | REP MOVSB
+    mov D$ebx+Log@BufferCurPos edi
 EndP
 ;
 ;
-Proc CloseLogFile:
-  USES ESI EDI
+Proc LogFlushBuffer::
+ ARGUMENTS @LogStruct
+ USES ebx
+    mov ebx D@LogStruct
+    mov eax D$ebx+Log@BufferCurPos | sub eax D$ebx+Log@Buffer | jle L0>
+    cmp eax LogBufferSize | jbe L1>
+    mov eax LogBufferSize ; ? size damaged?
+L1: call WriteMem2FileHandle D$ebx+Log@FileHandle D$ebx+Log@Buffer eax
+L0: move D$ebx+Log@BufferCurPos D$ebx+Log@Buffer
+EndP
+;
+;
+Proc LogFileClose::
+ ARGUMENTS @LogStruct
+ USES EBX ESI EDI
+    mov ebx D@LogStruct
     sub esi esi | sub edi edi
-    lock xchg D$LogFileHandle esi | lock xchg D$pOutputBuffer edi
-    test esi esi | je P9>
-    mov eax D$pOutBufCurPos | sub eax edi | jbe L0>
-    cmp eax LogBufferSize | jbe L1> ; ? size damaged?
-    mov eax LogBufferSize
+    lock xchg D$ebx+Log@FileHandle esi | lock xchg D$ebx+Log@Buffer edi | test esi esi | je P9>
+    mov eax D$ebx+Log@BufferCurPos | sub eax edi | jbe L0>
+    cmp eax LogBufferSize | jbe L1>
+    mov eax LogBufferSize ; ? size damaged?
 L1: call WriteMem2FileHandle esi edi eax
 L0: call CloseFlushHandle esi
     call VFree edi
 EndP
 ;
-;;
+;
 
+Proc User32LdrMsgBoxA:
+ USES EDI
+    sub edi edi
+    call LoadDllA user32dll | test eax eax | mov edi eax | je P9>
+    call GetProcAdr EDI MsgBoxA
+    mov edx edi
+EndP
 
- ;
-GetTimeTick: jmp 'Kernel32.GetTickCount'
 
 
 
@@ -1162,7 +1199,8 @@ EndP
 
 Proc UnloadDLL:
   Arguments @hDLL
-    call 'KERNEL32.FreeLibrary' D@hDLL
+    mov eax D@hDLL | test eax eax | je P9>
+    call 'KERNEL32.FreeLibrary' eax
 EndP
 
 Proc GetProcAdr:
@@ -1315,7 +1353,7 @@ Proc ChooseFileByNameAnsi::
  USES ESI EDI
 
     call ComDLG32LdrGOPFA | test eax eax | je P9>>
-    mov esi eax, edi edx 
+    mov esi eax, edi edx
     call VAlloc 010000 | mov D@pFileNameA eax | test eax eax | je B0>
     call VAlloc 010000 | mov D@pFileTitleA eax | test eax eax | je B0>
 
@@ -1352,7 +1390,7 @@ Proc ChooseFileByNameWide::
  USES ESI EDI
 
     call ComDLG32LdrGOPFW | test eax eax | je P9>>
-    mov esi eax, edi edx 
+    mov esi eax, edi edx
     call VAlloc 010000 | mov D@pFileNameW eax | test eax eax | je B0>
     call VAlloc 010000 | mov D@pFileTitleW eax | test eax eax | je B0>
 
@@ -1389,7 +1427,7 @@ Proc ChooseFileNameAnsi::
  USES ESI EDI
 
     call ComDLG32LdrGSFA | test eax eax | je P9>>
-    mov esi eax, edi edx 
+    mov esi eax, edi edx
     call VAlloc 010000 | mov D@pFileNameA eax | test eax eax | je B0>
     call VAlloc 010000 | mov D@pFileTitleA eax | test eax eax | je B0>
 
@@ -1426,7 +1464,7 @@ Proc ChooseFileNameWide::
  USES ESI EDI
 
     call ComDLG32LdrGSFW | test eax eax | je P9>>
-    mov esi eax, edi edx 
+    mov esi eax, edi edx
     call VAlloc 010000 | mov D@pFileNameW eax | test eax eax | je B0>
     call VAlloc 010000 | mov D@pFileTitleW eax | test eax eax | je B0>
 
@@ -1468,7 +1506,7 @@ Proc ChooseAndLoadFileByNameAnsi::
     call VFree EDX
     call LoadFileNameA2Mem D@pFileNameA
     mov esi eax | mov edi edx
-    call VFree D@pFileNameA 
+    call VFree D@pFileNameA
     mov eax esi | mov edx edi
 EndP
 
@@ -1484,6 +1522,6 @@ Proc ChooseAndSaveToFileNameAnsi::
     call VFree EDX
     call WriteMem2FileNameA D@pFileNameA D@pMem D@sz
     mov esi eax
-    call VFree D@pFileNameA 
+    call VFree D@pFileNameA
     mov eax esi
 EndP

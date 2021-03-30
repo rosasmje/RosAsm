@@ -1065,12 +1065,14 @@ EndP
 
 ____________________________________________________________________________________________
 
+ALIGN 16
+
 ; AnyBits1 / AnyBits2 = AnyBits3 ; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; Parameters Must be 32Bit aligned
 ; AnyBits3_size = (AnyBits1_HighBit - AnyBits2_HighBit) up_aligned on 32;
 ; AnyBits3 Out_buffer can be dirty, we clean.
-Proc AnyBitsDivision::
+Proc AnyBitsDivision0::
  ARGUMENTS @pAnyBits3 @nAnyBits3 @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
  Local @upBorder1 @upBorder2 @upBorder3 @AnyBits1Len @AnyBits2Len @HasReminder
  USES EBX ESI EDI
@@ -1108,7 +1110,8 @@ L1:
 ; clean Divident Buff for quick-out case.
     mov ecx D@upBorder3 | sub ecx edi | sub eax eax | shr ecx 2 | CLD | rep stosd
     jmp L9>>
-;ALIGN 4
+
+ALIGN 16
 ;
 L4:
     mov ecx D@upBorder1
@@ -1177,10 +1180,12 @@ B0:
 EndP
 
 
+ALIGN 16
+
 ; AnyBits1 MOD AnyBits2 ; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; Parameters Must be 32Bit aligned
-Proc AnyBitsModulus::
+Proc AnyBitsModulus0::
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
  Local @upBorder1 @upBorder2 @AnyBits1Len @AnyBits2Len @HasReminder
  USES EBX ESI EDI
@@ -1207,6 +1212,7 @@ L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
     sub edx D@pAnyBits1 | lea edx D$edx*8+eax
     mov D@AnyBits1Len edx
     mov D@HasReminder 1
+ALIGN 8
 ;
 L4:
     mov ecx D@upBorder1
@@ -1267,7 +1273,343 @@ B0:
 EndP
 
 
-; AnyBits1 MOD 2^(n-1); Quotent becomes Reminder
+ALIGN 16
+
+; AnyBits1 / AnyBits2 = AnyBits3 ; Quotent becomes Reminder
+; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
+; Parameters Must be 32Bit aligned
+; AnyBits3_size = (AnyBits1_HighBit - AnyBits2_HighBit) up_aligned on 32;
+; AnyBits3 Out_buffer can be dirty, we clean.
+Proc AnyBitsDivision::
+ ARGUMENTS @pAnyBits3 @nAnyBits3 @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
+ Local @upBorder1 @upBorder2 @upBorder3 @AnyBits1Len @AnyBits2Len @HasReminder @DivsHi32Bits
+ USES EBX ESI EDI
+
+    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0>> | shr eax 3 | je B0>>
+    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0>> | shr ecx 3 | je B0>>
+    mov edx D@nAnyBits3 | test edx 00_11111 | jne B0>> | shr edx 3 | je B0>>
+    mov edi D@pAnyBits3 | mov ebx D@pAnyBits1 | mov esi D@pAnyBits2
+    add eax ebx | add ecx esi | add edx edi
+    mov D@upBorder1 eax | mov D@upBorder2 ecx | mov D@upBorder3 edx
+    CLD
+; search Divisor's highest bits.
+L0:
+    mov edx D@upBorder2
+L0: sub edx 4 | cmp edx D@pAnyBits2 | jb B0>> ; Divisor can't be 0
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder2 ecx ; update upBorder
+    sub edx D@pAnyBits2 | lea edx D$edx*8+eax
+    mov D@AnyBits2Len edx
+; extract Divisor's Hi32bits
+    mov ebx D@upBorder2 | mov ecx 31 | cmp edx 32 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | mov D@DivsHi32Bits eax | jmp L1>
+L0: and edx 00_11111 | sub ecx edx
+    mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL | mov D@DivsHi32Bits eax
+L1:
+; search Quotent's highest bits.
+    mov D@HasReminder 0
+    mov edx D@upBorder1
+L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L1> ; Quotent is 0, End.
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
+    sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+    mov D@AnyBits1Len edx
+    mov D@HasReminder 1
+; calculate Divident minimum size
+    sub edx D@AnyBits2Len | jb L1> ; Quotent is less then Divisor, End.
+    and edx 0-32 | add edx 32 ; up_align_on 32
+    cmp D@nAnyBits3 edx | jb B0>> ; less size
+; clean Divident Buff
+    mov ecx D@upBorder3 | sub ecx edi | sub eax eax | shr ecx 2 | CLD | rep stosd
+    jmp L4>
+L1:
+; clean Divident Buff for quick-out case.
+    mov ecx D@upBorder3 | sub ecx edi | sub eax eax | shr ecx 2 | CLD | rep stosd
+    jmp L9>>
+ALIGN 16
+;
+L4:
+    mov edx D@upBorder1
+L0: sub edx 4 ;| cmp edx D@pAnyBits1 | jb L9>> ; quotent is 0, End. <NEVER
+    BSR eax D$edx | jne L0> | mov D@upBorder1 edx | jmp L0< ; update upBorder
+L0: sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+    mov D@AnyBits1Len edx
+
+; find bit_difference for UpShifting
+L0: cmp edx D@AnyBits2Len | jbe L3>>
+    mov ebx D@upBorder1 | mov ecx 31 | cmp edx 32 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | jmp L1>
+L0: and edx 00_11111 | sub ecx edx | mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL
+L1: cmp D@DivsHi32Bits eax | SETAE AL | and eax 1
+    mov ecx D@AnyBits1Len
+    sub ecx D@AnyBits2Len
+    sub ecx eax
+    mov ebx ecx | and ecx 00_11111 | shr ebx 3 | and ebx 0-4
+
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1 | mov edx D@pAnyBits3
+; write UpShifting Value at same Bit-position in Divident
+    sub eax eax | BTS eax ecx
+    add D$edx+ebx eax | jnc L0> | lea edx D$edx+ebx
+L2: add edx 4 | add D$edx 1 | jc L2< ; Big-ADC
+
+; UpShift&Substract
+L0:
+    cmp esi D@upBorder2 | jae L4<<
+    LODSD | test ecx ecx | je L1>
+;    sub edx edx | shld edx eax cl | NOP | shl eax cl | test edx edx | je L1> ; less fast ?
+    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
+    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
+    lea eax D$edi+ebx+4 | jmp L2>
+L1: sub D$edi+ebx eax | jnc L5>
+    lea eax D$edi+ebx
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L5: add edi 4 | jmp L0<
+
+; last step ; if Quotent is less > End
+L3: jb L9>
+
+; here Quotent_HighBit =  divisor_HighBit. Can last substraction happen?
+; Big-Comparision now
+    mov ecx D@upBorder2 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
+    sub ecx edi
+L0:
+    mov eax D$esi+ecx-4 | cmp eax D$edi+ecx-4 | jne L0>
+    sub ecx 4 | jne L0<
+    mov D@HasReminder 0
+; Equal case
+; if Quotent is less > End
+L0: jb L9>
+
+; else, we can set Divident's 1st bit, and last substraction can happen
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1 | mov edx D@pAnyBits3
+    add D$edx 1 | jnc L0>
+L2: add edx 4 | add D$edx 1 | jc L2< ; Big-ADC
+; last, direct substraction
+L0:
+    cmp esi D@upBorder2 | jae L9>
+    LODSD
+L1: sub D$edi eax | jnc L1>
+    mov eax edi
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L1: add edi 4 | jmp L0<
+
+L9: mov edx D@HasReminder
+    mov eax &TRUE | jmp P9>
+B0:
+   sub eax eax ; params ERROR case
+EndP
+
+
+ALIGN 16
+
+; AnyBits1 MOD AnyBits2 ; Quotent becomes Reminder
+; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
+; Parameters Must be 32Bit aligned
+Proc AnyBitsModulus::
+ ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
+ Local @upBorder1 @upBorder2 @AnyBits1Len @AnyBits2Len @HasReminder @DivsHi32Bits
+ USES EBX ESI EDI
+
+    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0>> | shr eax 3 | je B0>>
+    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0>> | shr ecx 3 | je B0>>
+
+    mov ebx D@pAnyBits1 | mov esi D@pAnyBits2
+    add eax ebx | add ecx esi
+    mov D@upBorder1 eax | mov D@upBorder2 ecx
+    CLD
+; search Divisor's highest bits.
+L0:
+    mov edx D@upBorder2
+L0: sub edx 4 | cmp edx D@pAnyBits2 | jb B0>> ; Divisor can't be 0
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder2 ecx ; update upBorder
+    sub edx D@pAnyBits2 | lea edx D$edx*8+eax
+    mov D@AnyBits2Len edx
+; extract Divisor's Hi32bits
+    mov ebx D@upBorder2 | mov ecx 31 | cmp edx 32 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | mov D@DivsHi32Bits eax | jmp L1>
+L0: and edx 00_11111 | sub ecx edx
+    mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL | mov D@DivsHi32Bits eax
+L1:
+; search Quotent's highest bits.
+    mov D@HasReminder 0
+    mov edx D@upBorder1
+L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
+    sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+    mov D@AnyBits1Len edx ;| cmp D@AnyBits2Len edx | ja L9>> ; Divisor > Quotent, End.
+    mov D@HasReminder 1
+ALIGN 8
+;
+L4:
+    mov edx D@upBorder1
+L0: sub edx 4 ;| cmp edx D@pAnyBits1 | jb L9>> ; quotent is 0, End. <NEVER
+    BSR eax D$edx | jne L0> | mov D@upBorder1 edx | jmp L0< ; update upBorder
+L0: sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+    mov D@AnyBits1Len edx
+
+; find bit_difference for UpShifting
+L0: cmp edx D@AnyBits2Len | jbe L3>>
+    mov ebx D@upBorder1 | mov ecx 31 | cmp edx 32 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | jmp L1>
+L0: and edx 00_11111 | sub ecx edx | mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL
+L1: cmp D@DivsHi32Bits eax | SETAE AL | and eax 1
+    mov ecx D@AnyBits1Len
+    sub ecx D@AnyBits2Len
+    sub ecx eax
+    mov ebx ecx | and ecx 00_11111 | shr ebx 3 | and ebx 0-4
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+
+; UpShift&Substract
+L0:
+    cmp esi D@upBorder2 | jae L4<
+    LODSD | test ecx ecx | je L1>
+;    sub edx edx | shld edx eax cl | NOP | shl eax cl | test edx edx | je L1> ; less fast ?
+    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
+    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
+    lea eax D$edi+ebx+4 | jmp L2>
+L1: sub D$edi+ebx eax | jnc L5>
+    lea eax D$edi+ebx
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L5: add edi 4 | jmp L0<
+
+; last step ; if Quotent is less > End
+L3: jb L9>
+; here Quotent_HighBit =  divisor_HighBit. Can last substraction happen?
+; Big-Comparision now
+    mov ecx D@upBorder2 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
+    sub ecx edi
+L0:
+    mov eax D$esi+ecx-4 | cmp eax D$edi+ecx-4 | jne L0>
+    sub ecx 4 | jne L0<
+    mov D@HasReminder 0
+; Equal case
+; if Quotent is less > End
+L0: jb L9>
+
+; else, last substraction can happen
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+; last, direct substraction
+L0:
+    cmp esi D@upBorder2 | jae L9>
+    LODSD
+L1: sub D$edi eax | jnc L1>
+    mov eax edi
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L1: add edi 4 | jmp L0<
+
+L9: mov edx D@HasReminder
+    mov eax &TRUE | jmp P9>
+B0:
+   sub eax eax ; params ERROR case
+EndP
+
+
+ALIGN 16
+
+; for Bits above 32bit size! > size in bytes
+; AnyBits1 MOD AnyBits2 ; Quotent becomes Reminder
+; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
+; Parameters Must be 4Byte aligned
+Proc AnyBitsModulusGrand::
+ ARGUMENTS @pAnyBits2 @nAnyBits2Bytes @pAnyBits1 @nAnyBits1Bytes
+ Local @upBorder1 @upBorder2 @AnyBits1BytesLen @AnyBits1Len32 @AnyBits2BytesLen @AnyBits2Len32 @HasReminder @DivsHi32Bits
+ USES EBX ESI EDI
+
+    mov eax D@nAnyBits1Bytes | test eax 00_11 | jne B0>> | cmp eax 0 | jle B0>>
+    mov ecx D@nAnyBits2Bytes | test ecx 00_11 | jne B0>> | cmp ecx 0 | jle B0>>
+
+    mov ebx D@pAnyBits1 | mov esi D@pAnyBits2
+    add eax ebx | add ecx esi
+    mov D@upBorder1 eax | mov D@upBorder2 ecx
+    CLD
+; search Divisor's highest bits.
+L0:
+    mov edx D@upBorder2
+L0: sub edx 4 | cmp edx D@pAnyBits2 | jb B0>> ; Divisor can't be 0
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder2 ecx ; update upBorder
+    sub edx D@pAnyBits2 | mov D@AnyBits2BytesLen edx | mov D@AnyBits2Len32 eax
+    mov edx eax
+; extract Divisor's Hi32bits
+    mov ebx D@upBorder2 | mov ecx 31 | cmp D@AnyBits2BytesLen 4 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | mov D@DivsHi32Bits eax | jmp L1>
+L0: sub ecx edx
+    mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL | mov D@DivsHi32Bits eax
+L1:
+; search Quotent's highest bits.
+    mov D@HasReminder 0
+    mov edx D@upBorder1
+L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
+    sub edx D@pAnyBits1 | mov D@AnyBits1BytesLen edx | mov D@AnyBits1Len32 eax
+    mov D@HasReminder 1
+NOP | NOP ;ALIGN
+;
+L4:
+    mov edx D@upBorder1
+L0: sub edx 4
+    BSR eax D$edx | jne L0> | mov D@upBorder1 edx | jmp L0< ; update upBorder
+L0: sub edx D@pAnyBits1 | mov D@AnyBits1BytesLen edx | mov D@AnyBits1Len32 eax
+
+; find bit_difference for UpShifting
+L0: cmp edx D@AnyBits2BytesLen | jb L3>> | ja L0>
+    cmp eax D@AnyBits2Len32 | jbe L3>>
+L0: mov edx eax
+    mov ebx D@upBorder1 | mov ecx 31 | cmp D@AnyBits2BytesLen 4 | jae L0>
+    mov eax D$ebx-4 | sub ecx edx | SHL eax CL | jmp L1>
+L0: sub ecx edx | mov eax D$ebx-4 | mov ebx D$ebx-8 | SHLD eax ebx CL
+L1: cmp D@DivsHi32Bits eax | SETAE AL | and eax 1
+    mov ecx D@AnyBits1Len32
+    sub ecx D@AnyBits2Len32
+    sub ecx eax | jns L0> | add ecx 32 | sub D@AnyBits1BytesLen 4
+L0: mov ebx D@AnyBits1BytesLen | sub ebx D@AnyBits2BytesLen
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+
+; UpShift&Substract
+L0:
+    cmp esi D@upBorder2 | jae L4<<
+    LODSD | test ecx ecx | je L1>
+;    sub edx edx | shld edx eax cl | NOP | shl eax cl | test edx edx | je L1> ; less fast ?
+    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
+    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
+    lea eax D$edi+ebx+4 | jmp L2>
+L1: sub D$edi+ebx eax | jnc L5>
+    lea eax D$edi+ebx
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L5: add edi 4 | jmp L0<
+
+; last step ; if Quotent is less > End
+L3: jb L9>
+; here Quotent_HighBit =  divisor_HighBit. Can last substraction happen?
+; Big-Comparision now
+    mov ecx D@upBorder2 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
+    sub ecx edi
+L0:
+    mov eax D$esi+ecx-4 | cmp eax D$edi+ecx-4 | jne L0>
+    sub ecx 4 | jne L0<
+; Equal case
+    mov D@HasReminder 0
+; if Quotent is less > End
+L0: jb L9>
+
+; else, last substraction can happen
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+; last, direct substraction
+L0:
+    cmp esi D@upBorder2 | jae L9>
+    LODSD
+L1: sub D$edi eax | jnc L1>
+    mov eax edi
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L1: add edi 4 | jmp L0<
+
+L9: mov edx D@HasReminder
+    mov eax &TRUE | jmp P9>
+B0:
+   sub eax eax ; params ERROR case
+EndP
+
+
+ALIGN 16
+
+; AnyBits1 MOD (2^n)-1; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; Parameters Must be 32Bit aligned
 Proc AnyBitsModulusOn2PowN1::
@@ -1297,15 +1639,12 @@ L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
     sub edx D@pAnyBits1 | lea edx D$edx*8+eax
     mov D@AnyBits1Len edx
     mov D@HasReminder 1
-
     mov edx D@pAnyBits1
-ALIGN 16
 ;
 L4:
     mov ecx D@upBorder1
 L0: sub ecx 4 ;| cmp ecx D@pAnyBits1 | jb L9>> ; quotent is 0, End. ?
     BSR eax D$ecx | jne L0> | mov D@upBorder1 ecx | jmp L0< ; update upBorder
-
 
 L0: sub ecx D@pAnyBits1 | lea ecx D$ecx*8+eax
     ;mov D@AnyBits1Len ecx
@@ -1352,6 +1691,110 @@ L9: mov edx D@HasReminder
 B0:
    sub eax eax ; params ERROR case
 EndP
+
+
+ALIGN 16
+
+; AnyBits1 MOD (2^n)+1 ; Quotent becomes Reminder
+; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
+; Parameters Must be 32Bit aligned
+Proc AnyBitsModulusOnFermatNumber::
+ ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
+ Local @upBorder1 @upBorder2 @AnyBits1Len @AnyBits2Len @HasReminder
+ USES EBX ESI EDI
+
+    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0>> | shr eax 3 | je B0>>
+    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0>> | shr ecx 3 | je B0>>
+
+    mov ebx D@pAnyBits1 | mov esi D@pAnyBits2
+    add eax ebx | add ecx esi
+    mov D@upBorder1 eax | mov D@upBorder2 ecx
+    CLD
+; search Divisor's highest bits.
+L0:
+    mov edx D@upBorder2
+L0: sub edx 4 | cmp edx D@pAnyBits2 | jb B0>> ; Divisor can't be 0
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder2 ecx ; update upBorder
+    sub edx D@pAnyBits2 | lea edx D$edx*8+eax
+    mov D@AnyBits2Len edx
+; search Quotent's highest bits.
+    mov D@HasReminder 0
+    mov edx D@upBorder1
+L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
+    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
+    sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+    mov D@AnyBits1Len edx
+    mov D@HasReminder 1
+NOP | NOP
+;
+L4:
+    mov ecx D@upBorder1
+L0: sub ecx 4 ;| cmp ecx D@pAnyBits1 | jb L9>> ; quotent is 0, End. <NEVER
+    BSR eax D$ecx | jne L0> | mov D@upBorder1 ecx | jmp L0< ; update upBorder
+L0: sub ecx D@pAnyBits1 | lea ecx D$ecx*8+eax
+    ;mov D@AnyBits1Len ecx
+
+; find ( bit_difference -1 ) for UpShifting
+L0: ;mov ecx D@AnyBits1Len |
+    sub ecx D@AnyBits2Len | jbe L3>>
+    dec ecx ; | mov D@BitDiff ecx
+    mov ebx ecx | and ecx 00_11111 | shr ebx 3 | and ebx 0-4
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+
+; UpShift&Substract
+L0:
+    cmp esi D@upBorder2 | jae L4<
+    mov eax D$esi | test ecx ecx | je L1>
+    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
+    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
+    lea eax D$edi+ebx+4 | jmp L2>
+L1: sub D$edi+ebx eax | jnc L5>
+    lea eax D$edi+ebx
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+
+L5: mov eax D@upBorder2 | sub eax esi | sub eax 4 | je L4<
+    add esi eax | add edi eax
+    mov eax D$esi | test ecx ecx | je L1>
+    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
+    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
+    lea eax D$edi+ebx+4 | jmp L2>
+L1: sub D$edi+ebx eax | jnc L5>
+    lea eax D$edi+ebx
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+
+L5: jmp L4<<
+
+; last step ; if Quotent is less > End
+L3: jb L9>
+; here Quotent_HighBit =  divisor_HighBit. Can last substraction happen?
+; Big-Comparision now
+    mov ecx D@upBorder2 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
+    sub ecx edi
+L0:
+    mov eax D$esi+ecx-4 | cmp eax D$edi+ecx-4 | jne L0>
+    sub ecx 4 | jne L0<
+    mov D@HasReminder 0
+; Equal case
+; if Quotent is less > End
+L0: jb L9>
+
+; else, last substraction can happen
+    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+; last, direct substraction
+L0:
+    cmp esi D@upBorder2 | jae L9>
+    LODSD
+L1: sub D$edi eax | jnc L1>
+    mov eax edi
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L1: add edi 4 | jmp L0<
+
+L9: mov edx D@HasReminder
+    mov eax &TRUE | jmp P9>
+B0:
+   sub eax eax ; params ERROR case
+EndP
+
 
 ; returns &FALSE on params_Error, else: eax=&TRUE, edx=Reminder
 ; Parameters Must be 32Bit aligned
@@ -2029,11 +2472,417 @@ C0:
     call AnyBitsMultiplicationKaratsubaRecursive D@M3p D@M3sz D@M2p D@M2sz D@M1p D@M1sz
 
 EndP
-;
-;
-;
-;
-;
+
+
+TITLE MPowPRP
+
+; ModPow for base2
+; returns: EAX=new_result_buffer EDX=bitSize; NULL on error;
+Proc AnyBitsModPowBase2AA::
+ Arguments @pExponent @szExponent @pMod @szMod
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    mov edx D@szMod | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    mov edx D@szExponent | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pExponent D@szExponent | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    mov ebx eax
+    call GetHighestBitPosition D@pMod D@szMod | cmp edx 0-1 | je E1>
+    test eax eax | jne L0> ; 0, 1 = End.
+E1: sub eax eax | jmp P9>>
+L0:
+    ALIGN_UP 32 eax | mov edi eax | shl edi 1 | add edi 32 | mov D@sqsz edi | shr edi 3
+    call VAlloc edi | mov D@sq1 eax | test eax eax | je E0>>
+    call VAlloc edi | mov D@sq2 eax | test eax eax | je E0>>
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pExponent | BT D$eax ebx | jnc L0>
+    ; x2
+    call AnyBitsShift1Left esi D@sq1sz | jnc L0>
+    mov eax D@sq1sz | shr eax 3 | mov D$esi+eax 1 | add D@sq1sz 32 ; enlarge
+L0: ; mod
+    call AnyBitsModulus D@pMod D@szMod esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov D@sq1 esi, D@sq2 edi
+    jmp L2>
+E0: sub esi esi | and D@sq1sz 0
+    call VFree D@sq1
+L2: call VFree D@sq2
+    mov eax esi, edx D@sq1sz, ecx D@sqsz
+EndP
+
+
+; ModPow for base2 ; caller passes 2 buffer for squaring
+; returns: EAX=result_buffer EDX=bitSize; NULL on error;
+Proc AnyBitsModPowBase2AAm::
+ Arguments @sq1 @sq2 @sqsz @pExponent @szExponent @pMod @szMod
+ cLocal @sq1sz @sq2sz
+ USES EBX ESI EDI
+
+    mov edx D@szMod | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    mov edx D@szExponent | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pExponent D@szExponent | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    mov ebx eax
+    call GetHighestBitPosition D@pMod D@szMod | cmp edx 0-1 | je E1>
+    test eax eax | jne L0> ; 0, 1 = End.
+E1: sub eax eax | jmp P9>>
+L0:
+    ALIGN_UP 32 eax | shl eax 1 | add eax 32 | cmp eax D@sqsz | ja E1<
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pExponent | BT D$eax ebx | jnc L0>
+    ; x2
+    call AnyBitsShift1Left esi D@sq1sz | jnc L0>
+    mov eax D@sq1sz | shr eax 3 | mov D$esi+eax 1 | add D@sq1sz 32 ; enlarge
+L0: ; mod
+    call AnyBitsModulus D@pMod D@szMod esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    jmp L2>
+E0: sub esi esi | and D@sq1sz 0
+L2:
+    mov eax esi, edx D@sq1sz
+EndP
+
+
+; ModPow for any 32bit base
+; returns: EAX=new_result_buffer EDX=bitSize; NULL on error;
+Proc AnyBitsModPowBase32bitAA::
+ Arguments @Base @pExponent @szExponent @pMod @szMod
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    mov edx D@szMod | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    mov edx D@szExponent | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    cmp D@Base 2 | jb E1>
+    call GetHighestBitPosition D@pExponent D@szExponent | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    mov ebx eax
+    call GetHighestBitPosition D@pMod D@szMod | cmp edx 0-1 | je E1>
+    test eax eax | jne L0> ; 0, 1 = End.
+E1: sub eax eax | jmp P9>>
+L0:
+    ALIGN_UP 32 eax | mov edi eax | shl edi 1 | add edi 32 | mov D@sqsz edi | shr edi 3
+    call VAlloc edi | mov D@sq1 eax | test eax eax | je E0>>
+    call VAlloc edi | mov D@sq2 eax | test eax eax | je E0>>
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pExponent | BT D$eax ebx | jnc L0>
+    ; mul Base
+    mov eax D@sq1sz | add eax 32 | mov D@sq2sz eax
+    call AnyBitsMul32Bit edi D@sq2sz D@Base esi D@sq1sz | test eax eax | je E0>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+L0: ; mod
+    call AnyBitsModulus D@pMod D@szMod esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov D@sq1 esi, D@sq2 edi
+    jmp L2>
+E0: sub esi esi | and D@sq1sz 0
+    call VFree D@sq1
+L2: call VFree D@sq2
+    mov eax esi, edx D@sq1sz, ecx D@sqsz
+EndP
+
+
+; ModPow for any base
+; returns: EAX=new_result_buffer EDX=bitSize; NULL on error;
+Proc AnyBitsModPowAAA::
+ Arguments @pBase @szBase @pExponent @szExponent @pMod @szMod
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    mov edx D@szMod | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    mov edx D@szExponent | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    mov edx D@szBase | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+
+    call GetHighestBitPosition D@pExponent D@szExponent | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    mov ebx eax
+    call GetHighestBitPosition D@pMod D@szMod | cmp edx 0-1 | je E1>
+    test eax eax | jne L0> ; 0, 1 = End.
+E1: sub eax eax | jmp P9>>
+L0:
+    ALIGN_UP 32 eax | mov edi eax | shl edi 1 | add edi D@szBase | mov D@sqsz edi | shr edi 3
+    call VAlloc edi | mov D@sq1 eax | test eax eax | je E0>>
+    call VAlloc edi | mov D@sq2 eax | test eax eax | je E0>>
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pExponent | BT D$eax ebx | jnc L0>
+    ; mul Base
+    mov eax D@sq1sz | add eax D@szBase | mov D@sq2sz eax
+    call AnyBitsMultiplication edi D@sq2sz D@pBase D@szBase esi D@sq1sz | test eax eax | je E0>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+L0: ; mod
+    call AnyBitsModulus D@pMod D@szMod esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov D@sq1 esi, D@sq2 edi
+    jmp L2>
+E0: sub esi esi | and D@sq1sz 0
+    call VFree D@sq1
+L2: call VFree D@sq2
+    mov eax esi, edx D@sq1sz, ecx D@sqsz
+EndP
+
+
+; Fermat's Little Theorem PRP Test for Base2
+; returns: 1 - is probably prime, 0 - is NOT prime; -1 on error;
+Proc FermatLittleTheoremBase2PRPTest::
+ Arguments @pNum @szNum
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    mov edx D@szNum | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pNum D@szNum | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    cmp eax 1 | je P9>> ; 2, 3 = End.
+    mov ebx eax
+    mov edx D@pNum | mov eax D$edx | and eax 1 | je P9>>
+    jmp L0>
+E1: or eax 0-1 | jmp P9>>
+L0: mov edi ebx
+    ALIGN_UP 32 edi | shl edi 1 | add edi 32 | mov D@sqsz edi | shr edi 3
+    call VAlloc edi | mov D@sq1 eax | test eax eax | je E0>>
+    call VAlloc edi | mov D@sq2 eax | test eax eax | je E0>>
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pNum | BT D$eax ebx | jnc L0>
+    ; mul Base
+    test ebx ebx | je L0> ; skip 0 pos
+    call AnyBitsShift1Left esi D@sq1sz | jnc L0>
+    mov eax D@sq1sz | shr eax 3 | mov D$esi+eax 1 | add D@sq1sz 32 ; enlarge
+L0: ; mod
+    call AnyBitsModulus D@pNum D@szNum esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov ebx 0 | cmp D@sq1sz 32 | jne L2>
+    cmp D$esi 1 | jne L2>
+    mov ebx 1
+    jmp L2>
+E0: or ebx 0-1
+L2: call VFree D@sq1
+    call VFree D@sq2
+    mov eax ebx
+EndP
+
+
+; for smaller (~1024bit?) numbers memory for squaring use on stack
+; Fermat's Little Theorem PRP Test for Base2
+; returns: 1 - is probably prime, 0 - is NOT prime; -1 on error;
+Proc FermatLittleTheoremBase2PRPTestS::
+ Arguments @pNum @szNum
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    mov edx D@szNum | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pNum D@szNum | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    cmp eax 1 | je P9>> ; 2, 3 = End.
+    mov ebx eax
+    mov edx D@pNum | mov eax D$edx | and eax 1 | je P9>>
+    jmp L0>
+E1: or eax 0-1 | jmp P9>>
+L0: mov edi ebx
+    ALIGN_UP 32 edi | shl edi 1 | add edi 32 | mov D@sqsz edi
+
+    push 0 ; border
+    mov ecx edi
+; allocate stack
+    SHR ecx 5 ; bits > dwords
+L0: push 0 | LOOP L0<
+L0: test esp (16-1) | je L0> | push 0 | jmp L0< ; stack down align 16
+L0: mov D@sq1 esp
+
+    push 0,0,0,0 ; border
+    mov ecx edi
+; allocate stack
+    SHR ecx 5
+L0: push 0 | LOOP L0<
+L0: test esp (16-1) | je L0> | push 0 | jmp L0<
+L0: mov D@sq2 esp
+
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pNum | BT D$eax ebx | jnc L0>
+    ; mul Base
+    test ebx ebx | je L0> ; skip 0 pos
+    call AnyBitsShift1Left esi D@sq1sz | jnc L0>
+    mov eax D@sq1sz | shr eax 3 | mov D$esi+eax 1 | add D@sq1sz 32 ; enlarge
+L0: ; mod
+    call AnyBitsModulus D@pNum D@szNum esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov ebx 0 | cmp D@sq1sz 32 | jne L2>
+    cmp D$esi 1 | jne L2>
+    mov ebx 1
+    jmp L2>
+E0: or ebx 0-1 ; err case
+L2:
+    mov eax ebx
+EndP ; stack restored in EndP macro
+
+
+
+; Fermat's Little Theorem PRP Test for any 32bit base
+; returns: 1 - is probably prime, 0 - is NOT prime; -1 on error;
+Proc FermatLittleTheoremBase32bitPRPTest::
+ Arguments @pNum @szNum @Base
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    cmp D@Base 2 | jb E1>
+    mov edx D@szNum | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pNum D@szNum | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    cmp eax 1 | je P9>> ; 2, 3 = End.
+    mov ebx eax
+    mov edx D@pNum | mov eax D$edx | and eax 1 | je P9>>
+    call AnyBitsMod32Bit D@pNum D@szNum D@Base | test eax eax | je E1>
+    mov eax edx | test eax eax | je P9>>
+    jmp L0>
+E1: or eax 0-1 | jmp P9>>
+L0: mov edi ebx
+    ALIGN_UP 32 edi | shl edi 1 | add edi 32 | mov D@sqsz edi | shr edi 3
+    call VAlloc edi | mov D@sq1 eax | test eax eax | je E0>>
+    call VAlloc edi | mov D@sq2 eax | test eax eax | je E0>>
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pNum | BT D$eax ebx | jnc L0>
+    ; mul Base
+    test ebx ebx | je L0> ; skip 0 pos
+    mov eax D@sq1sz | add eax 32 | mov D@sq2sz eax
+    call AnyBitsMul32Bit edi D@sq2sz D@Base esi D@sq1sz | test eax eax | je E0>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+L0: ; mod
+    call AnyBitsModulus D@pNum D@szNum esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov ebx 0 | cmp D@sq1sz 32 | jne L2>
+    cmp D$esi 1 | jne L2>
+    mov ebx 1
+    jmp L2>
+E0: or ebx 0-1
+L2: call VFree D@sq1
+    call VFree D@sq2
+    mov eax ebx
+EndP
+
+
+; for smaller (~1024bit?) numbers memory for squaring use on stack
+; Fermat's Little Theorem PRP Test for any 32bit base
+; returns: 1 - is probably prime, 0 - is NOT prime; -1 on error;
+Proc FermatLittleTheoremBase32bitPRPTestS::
+ Arguments @pNum @szNum @Base
+ cLocal @sq1sz @sq1 @sq2sz @sq2 @sqsz
+ USES EBX ESI EDI
+
+    cmp D@Base 2 | jb E1>
+    mov edx D@szNum | test edx 00_11111 | jne E1> | shr edx 3 | je E1>
+    call GetHighestBitPosition D@pNum D@szNum | cmp edx 0-1 | je E1>
+    test eax eax | je E1> ; 0, 1 = End.
+    cmp eax 1 | je P9>> ; 2, 3 = End.
+    mov ebx eax
+    mov edx D@pNum | mov eax D$edx | and eax 1 | je P9>>
+    call AnyBitsMod32Bit D@pNum D@szNum D@Base | test eax eax | je E1>
+    mov eax edx | test eax eax | je P9>>
+    jmp L0>
+E1: or eax 0-1 | jmp P9>>
+L0: mov edi ebx
+    ALIGN_UP 32 edi | shl edi 1 | add edi 32 | mov D@sqsz edi
+
+    push 0 ; border
+    mov ecx edi
+; allocate stack
+    SHR ecx 5 ; bits > dwords
+L0: push 0 | LOOP L0<
+L0: test esp (16-1) | je L0> | push 0 | jmp L0< ; stack down align 16
+L0: mov D@sq1 esp
+
+    push 0,0,0,0 ; border
+    mov ecx edi
+; allocate stack
+    SHR ecx 5
+L0: push 0 | LOOP L0<
+L0: test esp (16-1) | je L0> | push 0 | jmp L0<
+L0: mov D@sq2 esp
+
+    mov D@sq1sz 32
+    mov esi D@sq1 | mov edi D@sq2
+    mov D$esi 1
+L1: ; square
+    mov eax D@sq1sz | shl eax 1 | mov D@sq2sz eax
+    call AnyBitsSquare edi D@sq2sz, esi D@sq1sz | test eax eax | je E0>>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+    mov eax D@pNum | BT D$eax ebx | jnc L0>
+    ; mul Base
+    test ebx ebx | je L0> ; skip 0 pos
+    mov eax D@sq1sz | add eax 32 | mov D@sq2sz eax
+    call AnyBitsMul32Bit edi D@sq2sz D@Base esi D@sq1sz | test eax eax | je E0>
+    updateBitSize edi D@sq2sz
+    xchg esi edi | Exchange D@sq1sz D@sq2sz
+L0: ; mod
+    call AnyBitsModulus D@pNum D@szNum esi D@sq1sz | test eax eax | je E0>
+    updateBitSize esi D@sq1sz
+    sub ebx 1 | jae L1<<
+    mov ebx 0 | cmp D@sq1sz 32 | jne L2>
+    cmp D$esi 1 | jne L2>
+    mov ebx 1
+    jmp L2>
+E0: or ebx 0-1
+L2:
+    mov eax ebx
+EndP ; stack restored in EndP macro
+
 TITLE SQRT
 
 ALIGN 32
