@@ -409,7 +409,7 @@ ________________________________________________________________________________
 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF
 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF 0FF]
 
-Proc BaseHEXA2BinaryDecode::
+Proc BaseHexA2BinaryDecode::
  ARGUMENTS @pout, @pin, @insz
  USES ebx esi edi
 
@@ -1727,7 +1727,7 @@ proc pOword2HexA::
     mov eax edi | sub eax D@pString
  EndP
 
-proc pAnyBits2HexA::
+proc AnyBits2HexA::
  Arguments @pString @source @nBits
  USES esi edi
     mov ecx D@nBits | mov esi D@source | mov edi D@pString
@@ -1841,7 +1841,7 @@ USES ecx esi edi
  mov eax edi | sub eax D@pString
 EndP
 
-proc pAnyBits2HexA_T::
+proc AnyBits2HexA_T::
  Arguments @pString @pBits @nBits
  USES esi edi
     mov ecx D@nBits | mov esi D@pBits | mov edi D@pString
@@ -1913,6 +1913,429 @@ B1:
  stosw
 B4: ;mov B$edi 0; last NULL
  ret
+
+
+
+
+ALIGN 16
+; returns char count
+proc Binary2BitsA::
+ Arguments @pString @source @BytesCount
+ USES esi edi
+
+    CLD
+    sub eax eax
+    mov ecx D@BytesCount | test ecx ecx | jle P9>
+    mov esi D@source | mov edi D@pString
+B0: mov edx 8
+    LODSB
+B1: SHR eax 1 | jnc B2>
+    mov B$edi '1' | jmp B3>
+B2: mov B$edi '0'
+B3: inc edi | dec edx | jne B1<
+    dec ecx | jne B0<
+    mov eax edi | sub eax D@pString
+EndP
+
+
+ALIGN 4
+;Arguments @pString, @Byte
+Byte2BitsA::
+    mov eax D$esp+04 | mov edx D$esp+08
+    SHL eax 24
+    mov ecx 8
+B0: SHL eax 1 | jnc B2>
+    mov B$edx '1' | jmp B3>
+B2: mov B$edx '0'
+B3: inc edx
+    dec ecx | jne B0<
+    mov eax 8
+ ret 08
+
+
+ALIGN 4
+;Arguments @pString, @WORD
+Word2BitsA::
+    mov eax D$esp+04 | mov edx D$esp+08
+    SHL eax 16
+    mov ecx 16
+B0: SHL eax 1 | jnc B2>
+    mov B$edx '1' | jmp B3>
+B2: mov B$edx '0'
+B3: inc edx
+    dec ecx | jne B0<
+    mov eax 16
+ ret 08
+
+
+ALIGN 4
+;Arguments @pString, @DWORD
+Dword2BitsA::
+    mov eax D$esp+04 | mov edx D$esp+08
+    mov ecx 32
+B0: SHL eax 1 | jnc B2>
+    mov B$edx '1' | jmp B3>
+B2: mov B$edx '0'
+B3: inc edx
+    dec ecx | jne B0<
+    mov eax 32
+ ret 08
+
+
+ALIGN 16
+;nBits must be 32bit-aligned ; returns char count
+proc AnyBits2BitsA::
+ Arguments @pString @pBits @nBits
+ USES esi edi
+
+    sub eax eax
+    mov ecx D@nBits | test ecx 00_11111 | jne P9> | SHR ecx 3 | je P9>
+    mov esi D@pBits | mov edi D@pString
+    add esi ecx | SHR ecx 2
+B0: sub esi 4 | mov eax D$esi | mov edx 32
+B1: SHL eax 1 | jnc B2> | mov B$edi '1' | jmp B3>
+B2: mov B$edi '0'
+B3: inc edi | dec edx | jne B1<
+    dec ecx | jne B0<
+    mov eax edi | sub eax D@pString
+EndP
+
+
+ALIGN 16
+;nBits must be 32bit-aligned ; returns char count
+proc AnyBits2BitsA_T::
+ Arguments @pString @pBits @nBits
+ USES esi edi
+
+    sub eax eax
+    mov ecx D@nBits | test ecx 00_11111 | jne P9> | SHR ecx 3 | je P9>
+    mov esi D@pBits | mov edi D@pString
+    add esi ecx | SHR ecx 2
+B0: cmp D$esi-4 0 | jne B0> | sub esi 4 | dec ecx | jne B0<
+    mov W$edi '00' | add edi 2 | jmp B4> ; exit null case
+B0: mov D$edi '00_' | add edi 3
+    sub esi 4 | mov eax D$esi | mov edx 32
+B0: dec edx | SHL eax 1 | jnc B0<
+    mov B$edi '1' | inc edi | cmp edx 0 | je B0>
+B1: SHL eax 1 | jnc B2> | mov B$edi '1' | jmp B3>
+B2: mov B$edi '0'
+B3: inc edi | dec edx | jne B1<
+B0: dec ecx | je B4>
+
+B0: sub esi 4 | mov eax D$esi | mov edx 32
+B1: SHL eax 1 | jnc B2> | mov B$edi '1' | jmp B3>
+B2: mov B$edi '0'
+B3: inc edi | dec edx | jne B1<
+    dec ecx | jne B0<
+B4: mov eax edi | sub eax D@pString
+EndP
+
+
+
+
+ALIGN 4
+;Arguments dest, pString, CharCount ; returns Bits count
+; skips '_'
+proc BitsA2Binary::
+ Arguments @dest @pString @CharCount
+ USES esi edi
+
+    CLD
+    sub eax eax | sub edx edx
+    mov ecx D@CharCount | test ecx ecx | jle P9>
+    mov esi D@pString | mov edi D@dest
+B0: LODSB
+    cmp AL '_' | je B3> ; skip '_'
+    cmp AL '0' | jne B1>
+    BTR D$edi edx | jmp B2>
+B1: cmp AL '1' | jne B4>
+    BTS D$edi edx
+B2: inc edx
+B3: dec ecx | jne B0<
+;B4: test edx 00_111 | je B4> | and edx ( NOT 7); incomplete byte? let program decide
+B4: mov eax edx
+EndP
+
+
+ALIGN 4
+;Arguments pString, nChars; returns in AL/EAX
+BitsA2Byte::
+    mov edx D$esp+04 | mov ecx D$esp+08 | add D$esp+04 ecx
+    sub eax eax | sub ecx ecx
+B0: cmp B$edx '_' | je B2> ; skip '_'
+    cmp B$edx '1' | jne B1> | SHL eax 1 | or eax 1 | inc ecx | jmp B2>
+B1: cmp B$edx '0' | jne B3> ; out on other char
+    SHL eax 1 | inc ecx | jmp B2>
+B2: cmp ecx 8 | je B3>
+    inc edx | cmp edx D$esp+04 | jb B0<
+B3:
+ ret 08
+
+
+ALIGN 4
+;Arguments pString, nChars; returns in AX/EAX
+BitsA2Word::
+    mov edx D$esp+04 | mov ecx D$esp+08 | add D$esp+04 ecx
+    sub eax eax | sub ecx ecx
+B0: cmp B$edx '_' | je B2> ; skip '_'
+    cmp B$edx '1' | jne B1> | SHL eax 1 | or eax 1 | inc ecx | jmp B2>
+B1: cmp B$edx '0' | jne B3> ; out on other char
+    SHL eax 1 | inc ecx | jmp B2>
+B2: cmp ecx 16 | je B3>
+    inc edx | cmp edx D$esp+04 | jb B0<
+B3:
+ ret 08
+
+
+ALIGN 4
+;Arguments pString, nChars; returns in EAX
+BitsA2Dword::
+    mov edx D$esp+04 | mov ecx D$esp+08 | add D$esp+04 ecx
+    sub eax eax | sub ecx ecx
+B0: cmp B$edx '_' | je B2> ; skip '_'
+    cmp B$edx '1' | jne B1> | SHL eax 1 | or eax 1 | inc ecx | jmp B2>
+B1: cmp B$edx '0' | jne B3> ; out on other char
+    SHL eax 1 | inc ecx | jmp B2>
+B2: cmp ecx 32 | je B3>
+    inc edx | cmp edx D$esp+04 | jb B0<
+B3:
+ ret 08
+
+
+ALIGN 4
+;Arguments pBits memory(dword aligned), pString, CharCount ; returns Bits count
+; starts from last chars. (0,1) no other char expected
+proc BitsA2AnyBits::
+ Arguments @pBits @pString @nChars
+ USES esi edi
+
+    sub eax eax | sub edx edx
+    mov ecx D@nChars | test ecx ecx | jle P9>
+    mov edi D@pBits | mov esi D@pString
+B0: mov AL B$esi+ecx-1
+    cmp AL '0' | jne B1>
+    BTR D$edi edx | jmp B2>
+B1: cmp AL '1' | jne B4>
+    BTS D$edi edx
+B2: inc edx | dec ecx | jne B0<
+;B4: test edx 00_111 | je B4> | and edx ( NOT 7) ; incomplete byte?
+B4: mov eax edx
+EndP
+;
+;
+;
+;
+ALIGN 4
+;Arguments pBits memory(dword aligned), pString, CharCount
+; returns Bits count (8 aligned) ; req outmem size (3/8 + 4)
+; starts from last chars. (0..7) no other char expected
+proc OctalsA2AnyBits::
+ Arguments @pBits @pString @nChars
+ USES esi edi
+
+    sub eax eax
+    mov ecx D@nChars | test ecx ecx | jle P9>>
+    mov edi D@pBits | mov esi D@pString | jmp B1>>
+
+B4: movzx edx B$esi+ecx+7 | sub edx '0' | cmp edx 7 | ja B4>>
+    or eax edx
+    movzx edx B$esi+ecx+6 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 3 | or eax edx
+    movzx edx B$esi+ecx+5 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 6 | or eax edx
+    movzx edx B$esi+ecx+4 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 9 | or eax edx
+    movzx edx B$esi+ecx+3 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 12 | or eax edx
+    movzx edx B$esi+ecx+2 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 15 | or eax edx
+    movzx edx B$esi+ecx+1 | sub edx '0' | cmp edx 7 | ja B2>
+    SHL edx 18 | or eax edx
+
+B2: mov D$edi eax | add edi 3 | jmp B4>>
+
+B0: mov edx D$esi+ecx
+    sub DL '0' | cmp DL 7 | ja B4<< ; 7 can be valid
+    movzx eax DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 6
+    or AL DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 5
+    or AL DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 4
+    or AL DL
+    mov edx D$esi+ecx+4
+    SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 3
+    or AL DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 2
+    or AL DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4<< ; 1
+    or AL DL
+    SHR edx 8 | SHL eax 3 | sub DL '0' | cmp DL 7 | ja B4>>
+    or AL DL
+    mov D$edi eax | add edi 3
+B1: sub ecx 8 | jae B0<<
+    add ecx 8 | je B4>>
+    sub eax eax ; for first 1..7 char
+B0: movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B4>>
+    or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 3 | or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 6 | or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 9 | or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 12 | or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 15 | or eax edx | dec ecx | je B1>
+    movzx edx B$esi+ecx-1
+    sub edx '0' | cmp edx 7 | ja B1>
+    SHL edx 18 | or eax edx
+B1: mov D$edi eax | add edi 3
+B4: mov eax edi | sub eax D@pBits | SHL eax 3
+EndP
+
+
+ALIGN 4
+;Arguments pString, pBits, nBits (8! aligned),  ; returns Chars count
+; starts from last chars. (0..7) no other char expected
+; pBits will untouched. decoded buffer can have 1 or 2 more null byte at end.
+proc AnyBits2OctalsA::
+ Arguments @pString @pBits @nBits
+ USES ebx esi edi
+
+    CLD
+    mov ecx D@nBits | test ecx 00_111 | jne E0> | SHR ecx 3 | je E0>
+    mov esi D@pBits | mov edi D@pString ;| jmp B1>>
+    mov eax ecx | sub edx edx | mov ebx 3 | div ebx | mul ebx
+    mov ebx ecx | sub ebx eax | je B2>>
+    add eax esi | cmp ebx 2 | je B0> | movzx edx B$eax | jmp B1>
+B0: movzx edx W$eax
+    mov eax edx | SHR eax 15 | or Al '0' | STOSB
+    mov eax edx | SHR eax 12 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | SHR eax  9 | and AL 00_111 | or Al '0' | STOSB
+    sub ecx 1
+B1: mov eax edx | SHR eax  6 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | SHR eax  3 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB
+    sub ecx 1 | jmp B2>
+E0: sub eax eax | jmp P9>>
+
+B0: mov edx D$esi+ecx | SHL edx 8 | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB | ROL edx 3
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB
+B2: sub ecx 3 | jae B0<
+    add ecx 3 | je B4>
+    cmp ecx 2 | je B0> | movzx edx B$esi | jmp B1>
+B0: movzx edx W$esi
+    mov eax edx | SHR eax 15 | or Al '0' | STOSB
+    mov eax edx | SHR eax 12 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | SHR eax  9 | and AL 00_111 | or Al '0' | STOSB
+B1: mov eax edx | SHR eax  6 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | SHR eax  3 | and AL 00_111 | or Al '0' | STOSB
+    mov eax edx | and AL 00_111 | or Al '0' | STOSB
+B4: mov eax edi | sub eax D@pString
+EndP
+
+
+; returns Chars count
+Proc Dword2OctalsA::
+ ARGUMENTS @pString @Bit32
+ USES edi
+
+    CLD
+    mov edi D@pString
+    mov edx D@Bit32
+    ROL edx 2 | mov eax edx | and AL  00_11 | or Al '0' | STOSB
+    mov ecx 10
+B0: ROL edx 3 | mov eax edx | and AL 00_111 | or Al '0' | STOSB | dec ecx | jne B0<
+    mov eax edi | sub eax D@pString
+EndP
+
+; returns Chars count
+Proc Qword2OctalsA::
+ ARGUMENTS  @pString @Bit64Lo @Bit64Hi
+ USES edi
+
+    CLD
+    mov edi D@pString
+    mov edx D@Bit64Hi
+    mov ecx 10
+    ROL edx 1 | mov eax edx | and AL   00_1 | or Al '0' | STOSB
+B0: ROL edx 3 | mov eax edx | and AL 00_111 | or Al '0' | STOSB | dec ecx | jne B0<
+    ROL edx 3 | mov eax edx | and AL 00_100 | or Al '0' | STOSB ; partial
+    mov edx D@Bit64Lo
+    mov ecx 10
+    ROL edx 2 | mov eax edx | and AL  00_11 | or B$edi-1 Al ; fill prev partial
+B0: ROL edx 3 | mov eax edx | and AL 00_111 | or Al '0' | STOSB | dec ecx | jne B0<
+    mov eax edi | sub eax D@pString
+EndP
+
+; returns Chars count
+Proc pQword2OctalsA::
+ ARGUMENTS  @pString @pBit64
+ USES edi
+
+    CLD
+    mov edi D@pString
+    mov edx D@pBit64 | mov edx D$edx+4
+    mov ecx 10
+    ROL edx 1 | mov eax edx | and AL   00_1 | or Al '0' | STOSB
+B0: ROL edx 3 | mov eax edx | and AL 00_111 | or Al '0' | STOSB | dec ecx | jne B0<
+    ROL edx 3 | mov eax edx | and AL 00_100 | or Al '0' | STOSB ; partial
+    mov edx D@pBit64 | mov edx D$edx
+    mov ecx 10
+    ROL edx 2 | mov eax edx | and AL  00_11 | or B$edi-1 Al ; fill prev partial
+B0: ROL edx 3 | mov eax edx | and AL 00_111 | or Al '0' | STOSB | dec ecx | jne B0<
+    mov eax edi | sub eax D@pString
+EndP
+
+; returns Dword in EAX ; overflow case ECX=(0-1)
+Proc OctalsA2Dword::
+ ARGUMENTS @pOctalString
+ USES esi
+
+    sub eax eax
+    mov esi D@pOctalString
+    mov ecx 11 ; Highest dword in octal 37777777777
+B0: movzx edx B$esi | inc esi
+    sub edx '0' | cmp edx 7 | ja B1> ; end on other char
+    test eax 0E0000000 | jne B4> ; overflow for dword
+    SHL eax 3 | or eax edx
+    dec ecx | jne B0<
+B1: sub ecx ecx | jmp P9>
+B4: sub eax eax | or ecx 0-1 ; overflow case. result cleared
+EndP
+
+; returns Qword in EDX:EAX ; overflow case ECX=(0-1)
+Proc OctalsA2Qword::
+ ARGUMENTS @pOctalString
+ USES ebx esi edi
+
+    sub eax eax | sub edx edx
+    mov esi D@pOctalString
+    mov ecx 22 ; Highest qword in octal 1777777777777777777777
+B0: movzx edi B$esi | inc esi
+    sub edi '0' | cmp edi 7 | ja B1> ; end on other char
+    test edx 0E0000000 | jne B4> ; overflow for qword
+    mov ebx eax | SHL edx 3 | SHL eax 3 | ROL ebx 3
+    or eax edi | and ebx 00_111 | or edx ebx ; ebx passes 3bit from eax to edx;
+    dec ecx | jne B0<
+B1: sub ecx ecx | jmp P9>
+B4: sub eax eax | sub edx edx | or ecx 0-1 ; overflow case. result cleared
+EndP
 
 ____________________________________________________________________________________________
 
