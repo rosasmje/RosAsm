@@ -2271,8 +2271,8 @@ Proc doAnyBitsSquareRoot:
 DBGBP
     mov D@inMem1 eax, D@inSz1 edx
     updateByteSize D@inMem1 D@inSz1
-    mov edx D@inSz1 | SHL edx 3 | ALIGN_ON 64 edx | mov D@inSz1 edx
-    SHR edx 1 | ALIGN_ON 64 edx | mov D@outSz edx
+    mov edx D@inSz1 | SHL edx 3 | ALIGN_ON 32 edx | mov D@inSz1 edx
+    SHR edx 1 | ALIGN_ON 32 edx | add edx 32 | mov D@outSz edx
     SHR edx 3
     call VAlloc edx | test eax eax | je @BM
     mov D@outMem eax
@@ -2296,7 +2296,7 @@ DBGBP
     mov D@inMem1 eax, D@inSz1 edx
     updateByteSize D@inMem1 D@inSz1
     mov eax D@inSz1 | SHL eax 3 | ALIGN_ON 32 eax | mov D@inSz1 eax
-    sub edx edx | div D@Bit32 | cmp edx 0 | setne DL | and edx 1 | add eax edx
+    sub edx edx | div D@Bit32 | NEG edx | adc eax 0
     ALIGN_ON 32 eax | mov D@outSz eax
     SHR eax 3
     call VAlloc eax | test eax eax | je @BM

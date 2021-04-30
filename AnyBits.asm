@@ -452,6 +452,10 @@ L0:
 EndP
 
 
+; AnyBits1 = AnyBits1 + (2* AnyBits2) ;
+; returns 0 on params_Error, else 1; Sets Cflag state & EDX (1,2) for extending or 0.
+; Must be 32Bit aligned
+; AnyBits1_size >= AnyBits2_size
 Proc AnyBitsAddition2XSelf::
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
  Local @upBorder1 @upBorder2
@@ -468,7 +472,7 @@ L0:
     add ecx esi | mov D@upBorder2 ecx
     sub ebx ebx | sub ecx ecx | sub edx edx ; EDX holds CFlag state
 L0:
-    mov eax D$esi | add eax eax | setc BL ; double Cflag
+    mov eax D$esi | add eax eax | setc BL ; double's Cflag
     add eax edx   ; add saved CFlag
     setc cl                       ; "child" CFlag can appear here, either
     add D$edi eax | setc dl       ; "main" CFlag can appear here.
@@ -481,7 +485,8 @@ L0:
     add D$edi edx | setc dl      ; CFlag until death :)
     add edi 4 | test edx edx | jne L0<
 L0:
-    neg edx ; activates CFlag & EDX al bits set, else = 0;
+    neg edx
+    neg edx ; activates CFlag & EDX holds overload for extending, else = 0;
     mov eax &TRUE
 
 EndP
@@ -1064,7 +1069,7 @@ L0: sub ebx D@pAnyBits3 | mov eax ebx
 EndP
 
 ____________________________________________________________________________________________
-
+;;
 ALIGN 16
 
 ; AnyBits1 / AnyBits2 = AnyBits3 ; Quotent becomes Reminder
@@ -1271,7 +1276,7 @@ L9: mov edx D@HasReminder
 B0:
    sub eax eax ; params ERROR case
 EndP
-
+;;
 
 ALIGN 16
 
@@ -1609,7 +1614,7 @@ EndP
 
 ALIGN 16
 
-; AnyBits1 MOD (2^n)-1; Quotent becomes Reminder
+; AnyBits MOD (2^n)-1; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; Parameters Must be 32Bit aligned
 Proc AnyBitsModulusOn2PowN1::
@@ -1693,107 +1698,108 @@ B0:
 EndP
 
 
-ALIGN 16
 
-; AnyBits1 MOD (2^n)+1 ; Quotent becomes Reminder
+; AnyBits MOD (2^N)+1 ; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
-; Parameters Must be 32Bit aligned
-Proc AnyBitsModulusOnFermatNumber::
- ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
- Local @upBorder1 @upBorder2 @AnyBits1Len @AnyBits2Len @HasReminder
+; AnyBitsSz Must be Dword aligned
+Proc AnyBitsModulusOn2PowNplus1::
+ ARGUMENTS @ExponentOf2 @pAnyBits @AnyBitsSz
+ Local @upBorder1 @AnyBits1Len @FnHi @FmHiLoDiff @FnBitsLen @HasReminder
  USES EBX ESI EDI
 
-    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0>> | shr eax 3 | je B0>>
-    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0>> | shr ecx 3 | je B0>>
-
-    mov ebx D@pAnyBits1 | mov esi D@pAnyBits2
-    add eax ebx | add ecx esi
-    mov D@upBorder1 eax | mov D@upBorder2 ecx
-    CLD
-; search Divisor's highest bits.
+    mov eax D@AnyBitsSz | test eax eax | jle B0>> | test eax 00_11 | jne B0>>
+    mov ebx D@pAnyBits
+    add eax ebx
+    mov D@upBorder1 eax
 L0:
-    mov edx D@upBorder2
-L0: sub edx 4 | cmp edx D@pAnyBits2 | jb B0>> ; Divisor can't be 0
-    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder2 ecx ; update upBorder
-    sub edx D@pAnyBits2 | lea edx D$edx*8+eax
-    mov D@AnyBits2Len edx
+    mov ecx D@ExponentOf2 | cmp ecx 32 | jae L0>
+    cmp ecx 0FFFFFFDF | ja B0>> ; Highest Bit
+;    cmp ecx 0 | je L9>> ; Divisor=1
+    mov ebx 1 |  BTS ebx ecx
+    mov eax D@AnyBitsSz | shl eax 3
+    call AnyBitsMod32Bit D@pAnyBits eax ebx | test eax eax | je B0>>
+    mov edi D@pAnyBits, ecx D@AnyBitsSz | CLD | SHR ecx 2 | sub eax eax | REP STOSD
+    mov edi D@pAnyBits, D$edi edx | neg edx | sbb edx edx | and edx 1
+    mov D@HasReminder edx | jmp L9>>
+L0: mov D@FnBitsLen ecx
+    mov ebx ecx | and ecx 00_11111 | shr ebx 3 | and ebx 0-4 | mov D@FmHiLoDiff ebx
+    sub eax eax | BTS eax ecx | mov D@FnHi eax ; High bit's dword
+
 ; search Quotent's highest bits.
     mov D@HasReminder 0
     mov edx D@upBorder1
-L0: sub edx 4 | cmp edx D@pAnyBits1 | jb L9>> ; Quotent is 0, End.
-    BSR eax D$edx | je L0< | lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
-    sub edx D@pAnyBits1 | lea edx D$edx*8+eax
+L0: sub edx 4 | cmp edx D@pAnyBits | jb L9>> ; Quotent is 0, End.
+    BSR eax D$edx | je L0<
+    lea ecx D$edx+4 | mov D@upBorder1 ecx ; update upBorder
+    sub edx D@pAnyBits | lea edx D$edx*8+eax
     mov D@AnyBits1Len edx
     mov D@HasReminder 1
-NOP | NOP
 ;
 L4:
     mov ecx D@upBorder1
-L0: sub ecx 4 ;| cmp ecx D@pAnyBits1 | jb L9>> ; quotent is 0, End. <NEVER
+L0: sub ecx 4
     BSR eax D$ecx | jne L0> | mov D@upBorder1 ecx | jmp L0< ; update upBorder
-L0: sub ecx D@pAnyBits1 | lea ecx D$ecx*8+eax
+L0: sub ecx D@pAnyBits | lea ecx D$ecx*8+eax
     ;mov D@AnyBits1Len ecx
 
 ; find ( bit_difference -1 ) for UpShifting
 L0: ;mov ecx D@AnyBits1Len |
-    sub ecx D@AnyBits2Len | jbe L3>>
-    dec ecx ; | mov D@BitDiff ecx
+    sub ecx D@FnBitsLen | jbe L3>>
+    dec ecx
     mov ebx ecx | and ecx 00_11111 | shr ebx 3 | and ebx 0-4
-    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
+    mov edi D@pAnyBits
 
 ; UpShift&Substract
-L0:
-    cmp esi D@upBorder2 | jae L4<
-    mov eax D$esi | test ecx ecx | je L1>
-    mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
-    sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
-    lea eax D$edi+ebx+4 | jmp L2>
-L1: sub D$edi+ebx eax | jnc L5>
+    mov eax 1
+    shl eax cl
+    sub D$edi+ebx eax | jnc L5>
     lea eax D$edi+ebx
 L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
 
-L5: mov eax D@upBorder2 | sub eax esi | sub eax 4 | je L4<
-    add esi eax | add edi eax
-    mov eax D$esi | test ecx ecx | je L1>
+L5: add ebx D@FmHiLoDiff
+    mov eax D@FnHi | test ecx ecx | je L1>
     mov edx eax | shl eax cl | NOP | rol edx cl | xor edx eax | je L1>
     sub D$edi+ebx eax | sbb D$edi+ebx+4 edx | jnc L5>
     lea eax D$edi+ebx+4 | jmp L2>
-L1: sub D$edi+ebx eax | jnc L5>
+L1: sub D$edi+ebx eax | jnc L4<
     lea eax D$edi+ebx
 L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
-
-L5: jmp L4<<
+ L5: jmp L4<<
 
 ; last step ; if Quotent is less > End
 L3: jb L9>
 ; here Quotent_HighBit =  divisor_HighBit. Can last substraction happen?
 ; Big-Comparision now
-    mov ecx D@upBorder2 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
-    sub ecx edi
+    mov ecx D@FmHiLoDiff | add ecx 4
+    mov esi D@pAnyBits
+    cmp D$esi+ecx-4 1 | jne L0> | jmp L1>
 L0:
-    mov eax D$esi+ecx-4 | cmp eax D$edi+ecx-4 | jne L0>
-    sub ecx 4 | jne L0<
+    cmp D$esi+ecx-4 0 | jne L0>
+L1: sub ecx 4 | cmp ecx 4 | ja L0<
+    cmp D$esi+ecx-4 1 | jne L0>
     mov D@HasReminder 0
 ; Equal case
 ; if Quotent is less > End
 L0: jb L9>
 
 ; else, last substraction can happen
-    mov esi D@pAnyBits2 | mov edi D@pAnyBits1
-; last, direct substraction
-L0:
-    cmp esi D@upBorder2 | jae L9>
-    LODSD
-L1: sub D$edi eax | jnc L1>
+    mov edi D@pAnyBits
+    sub D$edi 1 | jnc L1>
     mov eax edi
 L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
-L1: add edi 4 | jmp L0<
+
+L1: mov edi D@upBorder1 | mov eax D@FnHi | sub edi 4
+    sub D$edi eax | jnc L1>
+    mov eax edi ; must not happen!
+L2: add eax 4 | sub D$eax 1 | jc L2< ; Big-SBB
+L1:
 
 L9: mov edx D@HasReminder
     mov eax &TRUE | jmp P9>
 B0:
-   sub eax eax ; params ERROR case
+   sub eax eax ; ERROR case
 EndP
+
 
 
 ; returns &FALSE on params_Error, else: eax=&TRUE, edx=Reminder
@@ -2885,8 +2891,9 @@ EndP ; stack restored in EndP macro
 
 TITLE SQRT
 
-ALIGN 32
+ALIGN 16
 
+; returns uint32 in EAX
 Proc SQRT32::
 ARGUMENTS @Bits32
  USES EBX
@@ -2903,12 +2910,6 @@ L0: BSR ebx D$edx | je P9> ; 0
 L0:
     inc eax | lea edx D$eax*2+edx+1
     cmp ecx edx | jb P9> | jne L0< | inc eax | jmp P9>
-;;
-    inc eax
-    cmp D@Bits32 9 | jb P9> ; 4-8
-    inc eax
-    cmp D@Bits32 16 | jb P9> ; 9-15
-;;
 L1:
     sub ecx ecx
 
@@ -2925,6 +2926,7 @@ L3: mov eax ecx
 EndP
 
 
+; returns uint32 in EAX
 Proc SQRT64::
 ARGUMENTS @pBits64
  USES EBX ESI
@@ -2937,9 +2939,6 @@ ARGUMENTS @pBits64
 L0: sub edx 4 | cmp edx esi | jb P9> ; 0, End.
     BSR ebx D$edx | je L0<
     sub edx esi | lea ebx D$edx*8+ebx
-;    cmp ebx 32 | jae L0>
-
-;    call SQRT32 D$esi | jmp P9>
 
 L0: shr ebx 1
     sub ecx ecx
@@ -2958,73 +2957,57 @@ L3: mov eax ecx
 EndP
 
 
+; returns uint64 in EDX:EAX
 Proc SQRT128::
-ARGUMENTS @pBits64 @pBits128
-Local @AnyBits1Len @SqSqr @pBits128a @pBits64a @pBits64b
+ARGUMENTS @pBits128
+ Local @H4 @H3 @H2 @H1
  USES EBX ESI EDI
 ;DBGBP
     sub eax eax
+    sub ecx ecx
+    sub edi edi
     sub ebx ebx
-    mov esi D@pBits128, edi D@pBits64
+    mov esi D@pBits128
     lea edx D$esi+16
 
-L0: sub edx 4 | cmp edx D@pBits128 | jb P9>> ; 0, End.
+L0: sub edx 4 | cmp edx esi | jb L3>> ; 0, End.
     BSR ebx D$edx | je L0<
     sub edx esi | lea ebx D$edx*8+ebx
-
-L0: cmp ebx 64 | jae L0>
-    call SQRT64 esi | mov D$edi eax | and D$edi+04 0
-    mov eax 1 | jmp P9>>
-
+    cmp ebx 64 | jae L0>
+    call SQRT64 esi | sub edx edx | jmp P9>>
 L0:
-; allocate stack
-    push 0,0,0,0 | mov D@pBits64a esp
-    push 0,0,0,0 | mov D@pBits64b esp
-    ;push D$esi+0C, D$esi+08, D$esi+04, D$esi |
-    push 0,0,0,0 | mov D@pBits128a esp
-
-    mov edi D@pBits64a
-    lea eax D$esi+8
-    call SQRT64 eax | mov D$edi+04 eax
-    jmp L4>>
-
-L0:
-    call AnyBitsCompare D@pBits64b 96 D@pBits64a 96 | test eax eax | je E0>>
-    cmp eax 3 | je L5>>
-    cmp ecx 4 | ja L1>
-    cmp eax 1 ; low dword direct adjustment
-    mov eax D@pBits64a, edx D@pBits64b, ecx D$eax, edx D$edx
-    je L2>
-    sub edx ecx | cmp edx 1 | je L5>>
-    add edx ecx
-L6: add ecx edx | mov edx 0 | adc edx 0 | shr ecx 1 | ror edx 1 | or ecx edx | mov D$eax ecx
-    jmp L4>>
+    shr ebx 1
+    add ebx 1
+L0: sub ebx 1
+    cmp ebx 32 | jb L2>
+    BTS edi ebx
+    mov eax edi | MUL eax
+    cmp edx D$esi+0C | ja L1> | jb L0<
+    cmp eax D$esi+08 | jb L0< | je L0>
+L1: BTR edi ebx
+    jmp L0<
+L0: mov ebx 31
 L2:
-    sub ecx edx | cmp ecx 1 | jne L2> | mov D$eax edx | jmp L5>>
-L2:
-    add ecx edx | jmp L6<
+    add ebx 1
+L0: sub ebx 1 | jl L3>
+    BTS ecx ebx
+    mov eax edi | MUL eax | mov D@H4 edx | mov D@H3 eax ; Square 64bit
+    mov eax ecx | MUL eax | mov D@H2 edx | mov D@H1 eax
+    mov eax ecx | MUL edi | sub esi esi
+    add edx edx | adc esi 0 | add eax eax | adc edx 0 | adc esi 0
+    add D@H2 eax | adc D@H3 edx | adc D@H4 esi
+    mov esi D@pBits128 ; cmp 128bits
+    mov eax D@H4 | cmp eax D$esi+0C | ja L1> | jb L0<
+    mov eax D@H3 | cmp eax D$esi+08 | ja L1> | jb L0<
+    mov eax D@H2 | cmp eax D$esi+04 | ja L1> | jb L0<
+    mov eax D@H1 | cmp eax D$esi | jb L0< | je L3>
+L1: BTR ecx ebx
+    jmp L0<
 
-L1:
-;    DBGBP
-    cmp eax 2 | jne L1>
-    call AnyBitsSubstraction D@pBits128a 96 D@pBits64a 96 D@pBits64b 96
-    call GetHighestBitPosition  D@pBits128a 96 | cmp edx 0-1 | je E0>>
-    cmp eax 2 | jb L5>
-L1:
-    call AnyBitsAdditionSelf D@pBits64b 96 D@pBits64a 96 | test eax eax | je E0>
-    call AnyBitsShift1Right D@pBits64a 96 | test eax eax | je E0>
-
-L4:
-    call CopyMemory D@pBits128a D@pBits128 16
-    call AnyBitsDivision D@pBits64b 96 D@pBits64a 96 D@pBits128a 128 | test eax eax | je E0>
-jmp L0<<
-
-E0: mov eax 0 | jmp P9>
-L5:
-L3:    call CopyMemory D@pBits64 D@pBits64a 8
-    mov eax 1
+L3: mov eax ecx | mov edx edi
 EndP
-
+;
+;
 ;
 Proc AnyBitsSQR2predict:
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
@@ -3063,7 +3046,7 @@ L0: push 0 | LOOP L0<
 L0: sub ebx 1 | jl L3>
     BTS D$edi ebx
     call AnyBitsSquareLong D@SqSqr (PredictSz*2*8) edi (PredictSz*8) | test eax eax | je B0>
-    call AnyBitsCompare D@SqSqr (PredictSz*2*8) ESI D@PowBitLen | cmp eax 0-1 | je B0>
+    call AnyBitsCompare D@SqSqr (PredictSz*2*8) ESI D@PowBitLen | test eax eax | je B0>
     cmp eax 1 | je L1> | cmp eax 3 | je L3>
     BTR D$edi ebx ; is >
 L1:
@@ -3075,18 +3058,17 @@ B0:
 EndP
 
 
- ;[VAlloc 'BaseRTL.VAlloc']
- ;[VFree 'BaseRTL.VFree']
 
-
+; returns EAX 0 on error; EAX=TRUE, EDX=SQRT bitSize
 Proc AnyBitsSquareRoot::
  Arguments @pSqrBits @nSqrBits @pBits @nBits
- cLocal @nSqrBits1 @pSqrBits1
 
+    updateBitSize D@pBits D@nBits
     mov ecx D@nBits
     cmp ecx 08000 | jae L1>
     cmp ecx 32 | je L2>
     cmp ecx 64 | je L3>
+    cmp ecx 128 | je L4>
     LEAVE | jmp AnyBitsSquareRootSmall
 L2:
     mov edx D@pBits
@@ -3094,21 +3076,22 @@ L2:
     mov edx D@pSqrBits | mov D$edx eax
     mov eax 1, edx 32 | jmp P9>
 L3:
-    mov edx D@pBits
-    call SQRT64 edx
-    mov edx D@pSqrBits | mov D$edx eax
+    call SQRT64 D@pBits
+    mov ecx D@pSqrBits | mov D$ecx eax
     mov eax 1, edx 32 | jmp P9>
+L4:
+    sub eax eax | cmp D@nSqrBits 64 | jb P9>
+    call SQRT128 D@pBits
+    mov ecx D@pSqrBits | mov D$ecx eax | mov D$ecx+4 edx
+    mov eax 1, edx 64 | jmp P9>
 L1:
-    call AnyBitsSquareRootBig D@pBits D@nBits | test eax eax | je P9>
-    mov D@pSqrBits1 eax, D@nSqrBits1 edx
-    mov eax D@nSqrBits1 | shr eax 3 | call CopyMemory D@pSqrBits D@pSqrBits1 eax
-    call VFree D@pSqrBits1
-    mov eax 1, edx D@nSqrBits1
+    call AnyBitsSquareRootBigM D@pSqrBits D@nSqrBits D@pBits D@nBits
 EndP
 ;
 ;
 ;
-; returns EAX 0 on error; EAX=pMem EDX= BitSize
+; returns EAX 0 on error;
+; New pSQRTmem=EAX, EDX=SQRTbitSize ; nBits>=256
 Proc AnyBitsSquareRootBig::
  Arguments @pBits @nBits
  cLocal @nSqrBits @pSqrBits @nSqrBits1 @pSqrBits1 @tpSqrBits @tnBits @pBits1 @tpBits
@@ -3118,8 +3101,7 @@ Proc AnyBitsSquareRootBig::
     mov edi D@nBits | test edi 00_11111 | jne E0>> | shr edi 3 | je E0>>
 
     call GetHighestBitPosition  D@pBits D@nBits | cmp edx 0-1 | je E0>>
-;    cmp eax 04000 | jbe E0>>
-    mov edi eax ; esi eax,
+    mov edi eax | ALIGN_UP 32 eax | cmp eax 0100 | jb E0>>
 
     ALIGN_UP 32 edi
     mov D@nBits edi | SHR edi 3
@@ -3188,10 +3170,91 @@ L0: mov ebx D@pSqrBits, edx D@nSqrBits
 EndP
 ;
 ;
+; returns EAX 0 on error; EAX=TRUE, EDX=SQRTbitSize ; nBits>=256
+; min nSqrtBits = (nBits /2)+32
+Proc AnyBitsSquareRootBigM::
+ Arguments @pSqrtBits @nSqrtBits @pBits @nBits
+ cLocal @nSqrBits1 @pSqrBits1 @tpSqrBits @tnBits @pBits1 @tpBits
+ USES EBX EDI
+
+    sub ebx ebx
+    mov edi D@nBits | test edi 00_11111 | jne E0>> | shr edi 3 | je E0>>
+    mov eax D@nSqrtBits | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
+    call GetHighestBitPosition  D@pBits D@nBits | cmp edx 0-1 | je E0>>
+    mov edi eax | ALIGN_UP 32 eax | cmp eax 0100 | jb E0>>
+    shr eax 1 | ALIGN_UP 32 eax | cmp D@nSqrtBits eax | jb E0>>
+    ALIGN_UP 32 edi
+    mov D@nBits edi | SHR edi 3
+    call VAlloc edi | test eax eax | je E0>> | mov D@pBits1 eax
+    shr edi 1 | je E0>> | ALIGN_ON 4 edi | add edi 4
+;    call VAlloc edi | test eax eax | je E0>> | mov D@pSqrBits eax
+    call VAlloc edi | test eax eax | je E0>> | mov D@pSqrBits1 eax
+    SHL edi 3 | mov D@nSqrBits1 edi | sub edi 32 | mov D@nSqrtBits edi
+;DBGBP
+;[PredictSz 8]
+    call AnyBitsSQR2predict D@pSqrtBits D@nSqrtBits D@pBits D@nBits | test eax eax | je E0>>
+
+    mov edi PredictSz
+L5:
+    SHL edi 1 ; upper chunk next size
+
+    mov eax D@nBits | shr eax 5 |  cmp edi eax | jbe L0> ; cmp to 1/4 of SQ size
+    mov eax D@nSqrtBits | shr eax 3 | cmp edi eax | ja L3>>
+    mov edi eax ; load full
+ L0:
+    mov eax D@nSqrtBits | shr eax 3 | add eax D@pSqrtBits | sub eax edi | mov D@tpSqrBits eax ; Num chunk pos
+    lea eax D$edi*8 | add eax 32 | mov D@nSqrBits1 eax ; Num chunk sz+32
+    mov eax D@tpSqrBits | sub eax D@pSqrtBits | SHL eax 1 | add eax D@pBits | mov D@tpBits eax ; SQ chunk pos
+    mov edx D@nBits | shr edx 3 | add edx D@pBits | sub edx D@tpBits | SHL edx 3 | mov D@tnBits edx ; SQ chunk sz
+    jmp L4>>
+
+L0:
+    call AnyBitsCompare D@pSqrBits1 D@nSqrBits1 D@tpSqrBits D@nSqrBits1 | test eax eax | je E0>>
+    cmp eax 3 | je L5<
+    cmp ecx 4 | ja L1>
+    cmp eax 1 ; low dword direct adjustment
+    mov eax D@tpSqrBits, edx D@pSqrBits1, ecx D$eax, edx D$edx
+    je L2>
+    sub edx ecx | cmp edx 1 | je L5<<
+    add edx ecx
+L6: add ecx edx | mov edx 0 | adc edx 0 | shr ecx 1 | ror edx 1 | or ecx edx | mov D$eax ecx
+    jmp L4>
+L2:
+    sub ecx edx | cmp ecx 1 | jne L2> | mov D$eax edx | jmp L5<<
+L2:
+    add ecx edx | jmp L6<
+
+L1:
+;    DBGBP
+    cmp eax 2 | jne L1>
+    call AnyBitsSubstraction D@pBits1 D@nSqrBits1 D@tpSqrBits D@nSqrBits1 D@pSqrBits1 D@nSqrBits1
+    call GetHighestBitPosition  D@pBits1 D@nSqrBits1 | cmp edx 0-1 | je E0>>
+    cmp eax 2 | jb L5<<
+L1:
+    call AnyBitsAdditionSelf D@pSqrBits1 D@nSqrBits1 D@tpSqrBits D@nSqrBits1 | test eax eax | je E0>
+    call AnyBitsShift1Right D@tpSqrBits D@nSqrBits1 | test eax eax | je E0>
+L4:
+    mov eax D@tnBits | shr eax 3 | call CopyMemory D@pBits1 D@tpBits eax
+    call AnyBitsDivision D@pSqrBits1 D@nSqrBits1 D@tpSqrBits D@nSqrBits1 D@pBits1 D@tnBits | test eax eax | je E0>
+jmp L0<<
+
+L3:
+    mov ebx 1
+E0:
+    call VFree D@pSqrBits1
+    call VFree D@pBits1
+    test ebx ebx | jne L0>
+    and D@nSqrtBits 0
+L0: mov edx D@nSqrtBits
+    mov eax ebx
+EndP
 ;
 ;
 ;
-; returns EAX 0 on error, EDX actual Bit Size
+;
+;
+; returns EAX 0 on error, EDX actual Bit Size ; nBits>64bit
+; min nSqrtBits = (nBits /2)align32 +32
 Proc AnyBitsSquareRootSmall::
  Arguments @pSqrBits @nSqrBits @pBits @nBits
  cLocal @nSqrBits1 @pSqrBits1 @tpSqrBits @tnBits @pBits1 @tpBits
@@ -3200,10 +3263,11 @@ Proc AnyBitsSquareRootSmall::
 
     sub ebx ebx
     mov edi D@nBits | test edi 00_11111 | jne E0>> | shr edi 3 | je E0>>
+    mov eax D@nSqrBits | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
     call GetHighestBitPosition  D@pBits D@nBits | cmp edx 0-1 | je E0>>
-    cmp eax 64 | jbe E0>>
+    cmp eax 64 | jb E0>>
     mov edi eax ; esi eax,
-    SHR eax 1 | ALIGN_UP 32 eax | cmp eax D@nSqrBits | ja E0>>
+    SHR eax 1 | ALIGN_UP 32 eax | cmp eax D@nSqrBits | jae E0>>
     mov D@nSqrBits eax | ALIGN_UP 32 edi | mov D@nBits edi
 
     push 0 ; border
@@ -3288,7 +3352,7 @@ EndP
 
 TITLE SQRTN
 
-ALIGN 32
+ALIGN 16
 
 Proc NRoot32::
 ARGUMENTS @Bits32 @RotN
@@ -3401,7 +3465,7 @@ L0: sub ebx 1 | jl L3>
     BTS D$edi ebx ; Try bit
     call AnyBitsPower D@pAnyBits2 D@nAnyBits2 D@RotN | test eax eax | je B0>
     mov D@SqSqr eax
-    call AnyBitsCompare D@SqSqr edx D@pAnyBits1 D@nAnyBits1 | cmp eax 0-1 | je B0>
+    call AnyBitsCompare D@SqSqr edx D@pAnyBits1 D@nAnyBits1 | test eax eax | je B0>
     cmp eax 1 | je L1> | cmp eax 3 | je L3>
     BTR D$edi ebx ; reset bit
 L1:
@@ -3422,6 +3486,7 @@ Proc AnyBitsNRoot::
  Arguments @pSqrBits @nSqrBits @pBits @nBits @NRoot
  cLocal @nSqrBits1 @pSqrBits1
 
+    updateBitSize D@pBits D@nBits
     mov ecx D@NRoot
     cmp ecx 2 | jl E0> | cmp ecx 010000000 | jb L0>
 E0: sub eax eax | jmp P9>>
@@ -3580,7 +3645,7 @@ L0: sub ebx 1 | jl L3>
     BTS D$edi ebx
     call AnyBitsPower edi NRootpredictBits D@NRoot | test eax eax | je B0>
     mov D@SqSqr eax, D@nSqSqr edx
-    call AnyBitsCompare D@SqSqr D@nSqSqr ESI D@PowBitLen | cmp eax 0-1 | je B0>
+    call AnyBitsCompare D@SqSqr D@nSqSqr ESI D@PowBitLen | test eax eax | je B0>
     cmp eax 1 | je L1> | cmp eax 3 | je L3>
     BTR D$edi ebx ; is >
 L1:
