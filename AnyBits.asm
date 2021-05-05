@@ -3181,19 +3181,19 @@ Proc AnyBitsSquareRootBigM::
     mov edi D@nBits | test edi 00_11111 | jne E0>> | shr edi 3 | je E0>>
     mov eax D@nSqrtBits | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
     call GetHighestBitPosition  D@pBits D@nBits | cmp edx 0-1 | je E0>>
-    mov edi eax | ALIGN_UP 32 eax | cmp eax 0100 | jb E0>>
-    shr eax 1 | ALIGN_UP 32 eax | cmp D@nSqrtBits eax | jb E0>>
-    ALIGN_UP 32 edi
+    mov edi eax | ALIGN_UP 32 edi | cmp edi 0100 | jb E0>>
+    shr eax 1 | ALIGN_UP 32 eax | add eax 32 | cmp eax D@nSqrtBits | ja E0>>
+
     mov D@nBits edi | SHR edi 3
     call VAlloc edi | test eax eax | je E0>> | mov D@pBits1 eax
     shr edi 1 | je E0>> | ALIGN_ON 4 edi | add edi 4
 ;    call VAlloc edi | test eax eax | je E0>> | mov D@pSqrBits eax
     call VAlloc edi | test eax eax | je E0>> | mov D@pSqrBits1 eax
-    SHL edi 3 | mov D@nSqrBits1 edi | sub edi 32 | mov D@nSqrtBits edi
+    SHL edi 3 | mov D@nSqrBits1 edi | mov D@nSqrtBits edi
 ;DBGBP
 ;[PredictSz 8]
     call AnyBitsSQR2predict D@pSqrtBits D@nSqrtBits D@pBits D@nBits | test eax eax | je E0>>
-
+    sub D@nSqrtBits 32
     mov edi PredictSz
 L5:
     SHL edi 1 ; upper chunk next size
@@ -3266,10 +3266,10 @@ Proc AnyBitsSquareRootSmall::
     mov eax D@nSqrBits | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
     call GetHighestBitPosition  D@pBits D@nBits | cmp edx 0-1 | je E0>>
     cmp eax 64 | jb E0>>
-    mov edi eax ; esi eax,
-    SHR eax 1 | ALIGN_UP 32 eax | cmp eax D@nSqrBits | jae E0>>
-    mov D@nSqrBits eax | ALIGN_UP 32 edi | mov D@nBits edi
-
+    mov edi eax | mov ecx D@nSqrBits
+    SHR eax 1 | ALIGN_UP 32 eax | add eax 32 | cmp eax ecx | ja E0>>
+    sub eax 32 | mov D@nSqrBits eax | ALIGN_UP 32 edi | mov D@nBits edi
+    sub eax eax | mov edi D@pSqrBits | SHR ecx 5 | CLD | REP STOSD | mov edi D@nBits
     push 0 ; border
 ; align stack 16
 L0: test esp (16-1) | je L0> | push 0 | jmp L0<
@@ -3297,7 +3297,8 @@ L0: push 0 | LOOP L0<
 call SQRT64 edx
     mov edx D@nSqrBits | shr edx 3 | add edx D@pSqrBits | sub edx PredictSSz
     mov ecx D@nBits | and ecx 32 | SHR ecx 4 | sub edx ecx | mov D$edx eax
-
+    test ecx 2 | je L0> | and W$edx-2 0 | and W$edx+4 0
+L0:
     mov edi PredictSSz
 L5:
     SHL edi 1 ; upper chunk next size
