@@ -1036,8 +1036,9 @@ E2:
 EndP
 
 
+ALIGN 4
 ; AnyBits1 * 32Bit = AnyBits3 ;
-; returns 0 on params_Error, else 1
+; returns 0 on params_Error, else size in length (dword aligned), min=4
 ; Parameters Must be 32Bit aligned
 ; AnyBits3_size = AnyBits1_size + 32Bits ;
 ; Out_buffer can be dirty, we clean.
@@ -1047,26 +1048,58 @@ Proc AnyBitsMul32Bit::
  USES EBX ESI EDI
 
     mov eax D@nAnyBits1 | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
-    mov edx D@nAnyBits3 | test edx 00_11111 | jne B0> | shr edx 3 | je B0>
-    add eax 4 | cmp edx eax | jb B0> ; out_buff_len check
+    mov ecx D@nAnyBits3 | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
+    add eax 4 | cmp ecx eax | jb B0> ; out_buff_len check
     sub eax 4
     mov esi D@pAnyBits1 | mov edi D@pAnyBits3
-    lea esi D$esi+eax-4 | mov ecx edx | lea edx D$edi+eax-4 | lea ebx D$edi+eax+4
-    shr ecx 2 | sub eax eax | CLD | rep stosd
+    lea esi D$esi+eax-4 | lea edx D$edi+eax-4 | lea ebx D$edi+eax+4
+    add ecx edi | mov edi edx | sub ecx edx
+    shr ecx 2 | sub eax eax | CLD | rep stosd ; clean upper chunk only enough
     mov edi edx | mov ecx D@Bit32 | jmp L0>
 B0: sub eax eax | jmp P9> ; params ERROR case
 
 ; MUL from upper dwords
 L0:
     mov eax D$esi | mul ecx | mov D$edi eax | test edx edx | je L1>
-    lea eax D$edi+4 | add D$eax edx | jnc L1>
-L2: add eax 4 | add D$eax 1 | jc L2< ; BIG-ADC ; no need upBorder check > sizes checked
+    add D$edi+4 edx | jnc L1>
+    lea eax D$edi+4 ; BIG-ADC ; no need upBorder check
+L2: add eax 4 | add D$eax 1 | jc L2<
 L1: sub edi 4 | sub esi 4 | cmp edi D@pAnyBits3 | jae L0<
 
-L9: cmp D$ebx-4 0 | jne L0> | sub ebx 4 | cmp ebx D@pAnyBits3 | ja L9< | add ebx 4
+L0: cmp D$ebx-4 0 | jne L0>
+    sub ebx 4 | cmp ebx D@pAnyBits3 | ja L0< | add ebx 4
 L0: sub ebx D@pAnyBits3 | mov eax ebx
-    ; Returns AnyBits length in bytes(32Bit aligned), min=4
 EndP
+
+
+ALIGN 4
+; AnyBits = AnyBits * 32Bit ; upper dword must be 0 to exclude overflow
+; returns 0 on params_Error, else size in length (dword aligned), min=4
+; Bits size Must be 32Bit aligned
+Proc AnyBitsMul32BitSelf::
+ ARGUMENTS @pAnyBits @nAnyBits @Bit32
+ USES ESI
+
+    mov eax D@nAnyBits | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
+    mov esi D@pAnyBits | mov ecx D@Bit32
+    lea esi D$esi+eax-4 | cmp D$esi 0 | je L0> ; upper dword = 0
+B0: sub eax eax | jmp P9> ; params ERROR case
+
+; MUL from upper dwords
+L0:
+    mov eax D$esi | test eax eax | je L1>
+    MUL ecx | mov D$esi eax | test edx edx | je L1>
+    add D$esi+4 edx | jnc L1>
+    lea eax D$esi+4 ; BIG-ADC ; no need upBorder check
+L2: add eax 4 | add D$eax 1 | jc L2<
+L1: sub esi 4 | cmp esi D@pAnyBits | jae L0<
+
+    mov eax D@nAnyBits | shr eax 3 | add eax D@pAnyBits
+L0: cmp D$eax-4 0 | jne L0>
+    sub eax 4 | cmp eax D@pAnyBits | ja L0< | add eax 4
+L0: sub eax D@pAnyBits
+EndP
+
 
 ____________________________________________________________________________________________
 ;;
@@ -1617,7 +1650,7 @@ ALIGN 16
 ; AnyBits MOD (2^n)-1; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; Parameters Must be 32Bit aligned
-Proc AnyBitsModulusOn2PowN1::
+Proc AnyBitsModulusOn2pNm1::
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
  Local @upBorder1 @upBorder2 @AnyBits1Len @AnyBits2Len @HasReminder
  USES EBX ESI EDI
@@ -1702,7 +1735,7 @@ EndP
 ; AnyBits MOD (2^N)+1 ; Quotent becomes Reminder
 ; returns EAX> FALSE on params_Error, else TRUE, EDX> Has REMINDER FALSE/TRUE
 ; AnyBitsSz Must be Dword aligned
-Proc AnyBitsModulusOn2PowNplus1::
+Proc AnyBitsModulusOn2pNp1::
  ARGUMENTS @ExponentOf2 @pAnyBits @AnyBitsSz
  Local @upBorder1 @AnyBits1Len @FnHi @FmHiLoDiff @FnBitsLen @HasReminder
  USES EBX ESI EDI
@@ -2199,6 +2232,104 @@ L0: sub edx 4 | cmp edx ecx | jb P9>
     sub edx ecx | lea eax D$edx*8+eax | jmp P9>
 L1: or eax 0-1 | or edx 0-1
 EndP
+
+
+
+; exchange Bits. Highest position bit <-> Lowest bit;
+; nAnybits 32bit aligned
+Proc AnyBitsSwapBits::
+ ARGUMENTS @pAnybitsOut @pAnybitsIn @nAnybits
+ USES ebx
+
+    mov edx D@nAnybits | test edx 00_11111 | je L0>
+    sub eax eax | jmp P9>
+L0: dec edx
+    sub ecx ecx
+    mov ebx D@pAnybitsIn
+    mov eax D@pAnybitsOut
+L0:
+    BT D$ebx edx | jc L1> | BTR D$eax ecx | jmp L2>
+L1: BTS D$eax ecx
+L2: add ecx 1 | sub edx 1 | jnc L0<
+    mov eax 1
+EndP
+
+
+; exchange Bits. Highest bit <-> Lowest bit;
+; nAnybits 32bit aligned
+Proc AnyBitsSwapBitsSelf::
+ ARGUMENTS @pAnybits @nAnybits
+ USES ebx
+
+    mov edx D@nAnybits | test edx 00_11111 | je L0>
+    sub eax eax | jmp P9>
+L0: dec edx
+    sub eax eax | sub ecx ecx
+    mov ebx D@pAnybits
+L0:
+    BT D$ebx ecx | SETC AL ; Lo bit
+    BT D$ebx edx | SETC AH ; Hi bit
+    cmp eax 0 | je L3> ; skip on similar bits
+    cmp eax 0101 | je L3>
+; case 01-00
+    cmp eax 01 | je L2>
+    BTR D$ebx edx | BTS D$ebx ecx | jmp L3>
+; case 00-01
+L2: BTS D$ebx edx | BTR D$ebx ecx
+L3: inc ecx | dec edx | cmp ecx edx | jb L0<
+    mov eax 1
+EndP
+
+
+; exchange Bits. Highest(active!) bit <-> Lowest bit;
+; nAnybits 32bit aligned
+Proc AnyBitsSwapBitsHi2Lo::
+ ARGUMENTS @pAnybitsOut @pAnybitsIn @nAnybits
+ USES edi
+
+    call GetHighestBitPosition D@pAnybitsIn D@nAnybits | cmp edx 0-1 | jne L0>
+    sub eax eax | jmp P9>
+L0: mov edx eax
+    mov ecx D@nAnybits | mov edi D@pAnybitsOut ; cleanUp bits above Hi
+    SHR ecx 3 | SHR eax 3 | add edi eax | sub ecx eax
+    sub eax eax | CLD | REP STOSB
+    mov edi D@pAnybitsIn
+    mov eax D@pAnybitsOut
+    sub ecx ecx
+L0:
+    BT D$edi edx | jc L1> | BTR D$eax ecx | jmp L2>
+L1: BTS D$eax ecx
+L2: add ecx 1 | sub edx 1 | jnc L0<
+    mov eax 1
+EndP
+
+
+; exchange Bits. Highest(active!) bit <-> Lowest bit;
+; nAnybits 32bit aligned
+Proc AnyBitsSwapBitsHi2LoSelf::
+ ARGUMENTS @pAnybits @nAnybits
+ USES ebx
+
+    call GetHighestBitPosition D@pAnybits D@nAnybits | cmp edx 0-1 | jne L0>
+    sub eax eax | jmp P9>
+L0: mov edx eax
+    sub eax eax | sub ecx ecx
+    mov ebx D@pAnybits
+L0:
+    BT D$ebx ecx | SETC AL ; Lo bit
+    BT D$ebx edx | SETC AH ; Hi bit
+    cmp eax 0 | je L3> ; skip on similar bits
+    cmp eax 0101 | je L3>
+; case 01-00
+    cmp eax 01 | je L2>
+    BTR D$ebx edx | BTS D$ebx ecx | jmp L3>
+; case 00-01
+L2: BTS D$ebx edx | BTR D$ebx ecx
+L3: inc ecx | dec edx | cmp ecx edx | jb L0<
+    mov eax 1
+EndP
+
+
 ;
 ;
 [ updateBitSize | mov edx #1 | mov eax #2
@@ -2889,6 +3020,8 @@ L2:
     mov eax ebx
 EndP ; stack restored in EndP macro
 
+
+
 TITLE SQRT
 
 ALIGN 16
@@ -3502,12 +3635,12 @@ L0:
     LEAVE | jmp AnyBitsNRootSmall
 L2:
     mov edx D@pBits
-    call NRoot32 D$edx | test eax eax | je P9>
+    call NRoot32 D$edx D@NRoot | test eax eax | je P9>
     mov edx D@pSqrBits | mov D$edx eax
     mov eax 1, edx 32 | jmp P9>
 L3:
     mov edx D@pBits
-    call NRoot64 edx | test eax eax | je P9>
+    call NRoot64 edx D@NRoot | test eax eax | je P9>
     mov edx D@pSqrBits | mov D$edx eax
     mov eax 1, edx 32 | jmp P9>
 L1:
@@ -3662,9 +3795,50 @@ EndP
 
 
 
+TITLE GCDs
+
+ALIGN 16
+
+; returns: EAX=0 params error: 32bit unaligned memory size or subsequent procs fails;
+; EAX=1, no GCD; EAX=3 numbers are same!; else EAX=GCDptr, EDX=GCDbitSize
+Proc GCD::
+ ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
+
+    mov eax D@nAnyBits1 | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
+    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne E0>> | shr ecx 3 | je E0>>
+
+    call AnyBitsCompare D@pAnyBits2 D@nAnyBits2 D@pAnyBits1 D@nAnyBits1 | test eax eax | je E0>>
+    cmp eax 3 | je P9>> | cmp eax 1 | je L0>
+    exchange D@pAnyBits1 D@pAnyBits2, D@nAnyBits1 D@nAnyBits2
+L0:
+    call GetHighestBitPosition D@pAnyBits2 D@nAnyBits2 | cmp eax 0 | jne L0>
+    mov eax D@pAnyBits2 | mov eax D$eax | cmp eax 1 | je P9>> ; on 1, say no GCD, as on finish
+    mov eax D@pAnyBits1, edx D@nAnyBits1 ; on 0, other is GCD. by convention.
+    jmp P9>>
+L0:
+    updateBitSize D@pAnyBits1 D@nAnyBits1
+    updateBitSize D@pAnyBits2 D@nAnyBits2
+L0:
+    call AnyBitsModulus D@pAnyBits2 D@nAnyBits2 D@pAnyBits1 D@nAnyBits1 | test eax eax | je E0>
+    updateBitSize D@pAnyBits1 D@nAnyBits1
+    call GetHighestBitPosition D@pAnyBits1 D@nAnyBits1 | cmp eax 0 | je L0>
+    exchange D@pAnyBits1 D@pAnyBits2, D@nAnyBits1 D@nAnyBits2
+    jmp L0<
+L0:
+; 0 or 1 ?
+    sub edx edx | mov eax D@pAnyBits1 | mov eax D$eax | cmp eax 1 | je P9> ; on 1, say no GCD
+    mov eax D@pAnyBits2, edx D@nAnyBits2
+    jmp P9>
+E0:
+    sub eax eax ; params ERROR case
+EndP
+
+
+
 TITLE DLLMAIN
 ____________________________________________________________________________________________
 
+ALIGN 16
 
 main:
     mov eax 1
@@ -3672,7 +3846,7 @@ main:
 
 
 AnyBitsVersion::
-    mov eax 010003
+    mov eax 010004
     ret
 
 

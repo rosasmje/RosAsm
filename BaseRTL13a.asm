@@ -1494,7 +1494,7 @@ Proc doRationalDecimal2RationalBits:
     mov D@inMem eax, D@inSz edx
 DBGBP
     mov eax '.' | mov edi D@inMem | mov ecx edx | REPNE SCASB | add edx ecx
-    mov eax edx, edx 5, ecx 12 | mul edx | div ecx | add eax 4
+    mov eax edx, edx 4, ecx 10 | mul edx | div ecx | add eax 4
 L0:
     ALIGN_ON 4 eax
     mov D@outSz eax
@@ -1503,7 +1503,7 @@ L1: call VAlloc D@outSz | mov D@outMem eax | test eax eax | je @BM
 call SetStartTick
     mov eax D@outSz | shl eax 3
     call 'BaseCodecs.AnyRationalDecimal2RationalBits'  D@outMem, eax, D@inMem | test eax eax | jne L0>
-    inc ecx | jne @BM | call VFree D@outMem | add D@outSz 16 | jmp L1<
+    inc ecx | jne @BM | call VFree D@outMem | mov eax D@outSz | SHR eax 2 | add D@outSz eax | jmp L1<
 L0:
     mov D@outSz eax | add D@outSz edx | SHR D@outSz 3
 call SetEndTickReport
@@ -1525,7 +1525,7 @@ L2: call Input32BitNumber | test eax eax | mov ebx eax | je L0>
     test ebx 01F | jne L2<
 L0:
 
-    mov eax D@inSz | sub edx edx | mov ecx 12 | div ecx | inc eax | mov edx 29 | mul edx | jc @BM
+    mov eax D@inSz | sub edx edx | mov ecx 4 | div ecx | inc eax | mov edx 10 | mul edx | jc @BM
 L0:
     ALIGN_ON 4 eax
 L1: mov D@outSz eax
@@ -2093,6 +2093,11 @@ Proc doAnyBitsMOD:
 DBGBP
     updateByteSize D@inMem1 D@inSz1
     updateByteSize D@inMem2 D@inSz2
+
+    move D$AnyBitsDIVQuotent D@inMem1, D$AnyBitsDIVQuotent+4 D@inSz1 | SHL D$AnyBitsDIVQuotent+4 3
+    move D$AnyBitsDIVDivizor D@inMem2, D$AnyBitsDIVDivizor+4 D@inSz2 | SHL D$AnyBitsDIVDivizor+4 3
+    call 'AnyBits.GetHighestBitPosition' D$AnyBitsDIVDivizor D$AnyBitsDIVDivizor+4 | mov D$AnyBitsDIVDivizor+4 eax
+    mov D$JobReporterAddr reportAnyBitsDIV
 call SetStartTick
     mov eax D@inSz1, edx D@inSz2
     shl eax 3 | shl edx 3
@@ -4344,17 +4349,17 @@ TITLE cosmocomprso
 ____________________________________________________________________________________________
 
 Proc makeBigNumFromPrimes:
- ARGUMENTS @nBits
+ ARGUMENTS @nBits @StartPrime
  cLocal @BitSz
  USES ebx esi edi
     mov ebx D@nBits | shr ebx 3 | add ebx 4
     call VAlloc ebx | mov esi eax | test eax eax | je @BM
     call VAlloc ebx | mov edi eax | test eax eax | je @BM
 
-    mov D$esi 3, D@BitSz 32 | mov ebx 3
+    mov D$esi 1, D@BitSz 32 | mov ebx D@StartPrime | jmp L1>
 L0:
     call 'NUMERIKO.FindNextPrimeDwordNumeriko32' ebx | test eax eax | je @BM | mov ebx eax
-
+L1:
     mov eax D@BitSz | add eax 32
     call 'AnyBits.AnyBitsMul32Bit' edi eax ebx esi D@BitSz | test eax eax | je @BM
     shl eax 3 | mov D@BitSz eax | xchg esi edi | cmp eax D@nBits | jbe L0<
@@ -4366,7 +4371,7 @@ L0:
     call VFree edi | sub edi edi | and D@nBits 0
 L0:
     call VFree esi |
-    mov eax edi, edx D@nBits
+    mov eax edi, edx D@nBits, ecx ebx
 EndP
 ;
 ;
@@ -6899,7 +6904,7 @@ L0: cmp D$JobAskToEnd &TRUE | je E0>>
 ;L2:
 ;    call 'AnyBits.GetHighestBitPosition' D@Sn ebx | cmp eax 0-1 | je E0>
 ;    cmp eax D@inMemHighBit | jb L2>
-    call 'AnyBits.AnyBitsModulusOn2PowN1' D@m2P1 D@m2P1Sz D@Sn ebx | test eax eax | je E0> ;'AnyBits.AnyBitsModulus'
+    call 'AnyBits.AnyBitsModulusOn2pNm1' D@m2P1 D@m2P1Sz D@Sn ebx | test eax eax | je E0> ;'AnyBits.AnyBitsModulus'
     test edx edx | je L1>
     call 'AnyBits.GetHighestBitPosition' D@Sn ebx | cmp eax 0-1 | je E0>
 ;L2: cmp eax 0 | jne L2> | inc eax ; for 32 ALIGN need
