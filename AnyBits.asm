@@ -832,70 +832,15 @@ L1:
     mov eax &TRUE
 EndP
 
-;;
-; AnyBits1 Square = AnyBits2 ;
-; returns 0 on params_Error, else 1
-; Parameters Must be 32Bit aligned
-; AnyBits2_size = AnyBits1_size *2 ;
-; Out_buffer can be dirty, we clean.
-Proc AnyBitsSquare0:
- ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
- Local @upBorder1 ;@upBorder2 ;@upBorder3 ; < not used
- USES EBX ESI EDI
-
-    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
-    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
-    mov edx eax | shl edx 1 | cmp ecx edx | jb B0> ; out_buf_len check
-
-    mov esi D@pAnyBits1 | mov edi D@pAnyBits2
-
-L0: add eax esi | mov D@upBorder1 eax
-    sub eax eax | shr ecx 2 | CLD | rep stosd ; clean outBuff
-    jmp L0>
-B0: sub eax eax | jmp P9> ; params ERROR case
-
-ALIGN 16
-L0: mov ecx D$esi; | test ecx ecx | je L1>
-    mov ebx D@pAnyBits1 | mov edi D@pAnyBits2 ;
-L4: cmp ebx esi | jb L5>
-    mov eax D$ebx | mul ecx
-    cmp ebx esi | je L3>
-; 2x EDX:EAX
-    add eax eax | adc edx edx | jnc L3>
-;inc D$BIGADCcounter1
-    add D$edi+8 1 | jnc L3> ; +1 chance to avoid BIG-ADC
-;inc D$BIGADCcounter2
-; BIG-ADC
-    push eax
-    lea eax D$edi+8
-L2: add eax 4 | add D$eax 1 | jc L2<
-    pop eax
-
-L3: add D$edi eax | adc D$edi+4 edx | jnc L5>
-;inc D$BIGADCcounter3
-    add D$edi+8 1 | jnc L5> ; +1 chance to avoid BIG-ADC
-;inc D$BIGADCcounter4
-; BIG-ADC
-    lea eax D$edi+8
-L2: add eax 4 | add D$eax 1 | jc L2<
-
-L5: add ebx 4 | add edi 4 | cmp ebx D@upBorder1 | jb L4<
-L1:
-    add esi 4 | add D@pAnyBits2 4 ; 32bit SHIFT
-    cmp esi D@upBorder1 | jb L0<
-
-    mov eax &TRUE
-EndP
-;;
 ;[BIGADCcounter1: D$ 0 BIGADCcounter2: D$ 0 BIGADCcounter3: D$ 0 BIGADCcounter4: D$ 0 ]
-
+;;
 ALIGN 4
 ; AnyBits1 Square = AnyBits2 ;
 ; returns 0 on params_Error, else 1
 ; Parameters Must be 32Bit aligned
 ; AnyBits2_size = AnyBits1_size *2 ;
 ; Out_buffer can be dirty, we clean.
-Proc AnyBitsSquareLong::
+Proc AnyBitsSquareLong1::
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
  Local @upBorder1 ;@upBorder2 ;@upBorder3 ; < not used
  USES EBX ESI EDI
@@ -944,8 +889,79 @@ L1:
 
     mov eax &TRUE
 EndP
+;;
+;
+ALIGN 8
+; AnyBits1 Square = AnyBits2 ;
+; returns 0 on params_Error, else 1
+; Parameters Must be 32Bit aligned
+; AnyBits2_size = AnyBits1_size *2 ;
+; Out_buffer can be dirty, we clean.
+Proc AnyBitsSquareLong::
+ ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
+ Local @upBorder1 ;@upBorder2 ;@upBorder3 ; < not used
+ USES EBX ESI EDI
 
+    mov eax D@nAnyBits1 | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
+    mov ecx D@nAnyBits2 | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
+    mov edx eax | SHL edx 1 | cmp ecx edx | jb B0> ; out_buf_len check
 
+    mov edi D@pAnyBits1
+    mov ecx eax | SHR ecx 2 | add edi eax
+    sub eax eax | sub edi 4 | STD | REPE SCASD | CLD | je L1>
+    add edi 8 | mov D@upBorder1 edi | jmp L0> ; cut upper nulls
+; NULL case: clean outBuff & exit
+L1: mov edi D@pAnyBits2 | mov ecx D@nAnyBits2
+    sub eax eax | SHR ecx 5 | CLD | REP STOSD | mov eax 1 | jmp P9>>
+B0: sub eax eax | jmp P9>> ; params ERROR case
+
+L0: mov ecx D@upBorder1 | mov esi D@pAnyBits1 | mov edi D@pAnyBits2
+    sub ecx esi | SHR ecx 2
+L0: ;firstly square every dword, so no need to clean buffer
+    mov eax D$esi | MUL eax | mov D$edi eax, D$edi+4 edx
+    add esi 4 | add edi 8 | dec ecx | jne L0<
+; clean rest of upper
+    mov ecx D@nAnyBits2 | SHR ecx 3 | add ecx D@pAnyBits2 | sub ecx edi | je L0>
+    sub eax eax | SHR ecx 2 | CLD | REP STOSD
+L0:
+    mov esi D@pAnyBits1 | add esi 4 ; this excludes last dword
+ALIGN 8
+L0: mov ecx D$esi-4 | test ecx ecx | je L1>
+    mov ebx D@pAnyBits1 | mov edi D@pAnyBits2
+
+L4: cmp ebx esi | ja L6>
+    mov eax esi | sub eax ebx | add edi eax | add ebx eax
+L6: mov eax D$ebx | MUL ecx
+
+; 2x EDX:EAX
+    add eax eax | adc edx edx | jnc L3>
+;inc D$BIGADCcounter1
+    add D$edi+8 1 | jnc L3> ; +1 chance to avoid BIG-ADC
+;inc D$BIGADCcounter2
+; BIG-ADC
+    push edi
+    add edi 8
+L2: add edi 4 | add D$edi 1 | jc L2<
+    pop edi
+
+L3: add D$edi eax | adc D$edi+4 edx | jnc L5>
+;inc D$BIGADCcounter3
+    add D$edi+8 1 | jnc L5> ; +1 chance to avoid BIG-ADC
+;inc D$BIGADCcounter4
+; BIG-ADC
+    lea eax D$edi+8
+L2: add eax 4 | add D$eax 1 | jc L2<
+
+L5: add ebx 4 | add edi 4 | cmp ebx D@upBorder1 | jb L4<
+
+L1:
+    add esi 4 | add D@pAnyBits2 4 ; 32bit SHIFT
+    cmp esi D@upBorder1 | jb L0<
+
+    mov eax &TRUE
+EndP
+;
+;
 ALIGN 4
 ; AnyBitsIn pow N = AnyBitsOut ;
 ; returns 0 on params_Error, else:
@@ -1745,8 +1761,8 @@ Proc AnyBitsModulusOn2pNp1::
     add eax ebx
     mov D@upBorder1 eax
 L0:
-    mov ecx D@ExponentOf2 | cmp ecx 32 | jae L0>
-    cmp ecx 0FFFFFFDF | ja B0>> ; Highest Bit
+    mov ecx D@ExponentOf2 | cmp ecx 0FFFFFFDF | ja B0>> ; max Highest Bit
+    cmp ecx 32 | jae L0>
 ;    cmp ecx 0 | je L9>> ; Divisor=1
     mov ebx 1 |  BTS ebx ecx
     mov eax D@AnyBitsSz | shl eax 3
@@ -2339,19 +2355,99 @@ EndP
 ;
 ;
 AnyBitsSquare::
-    cmp D$esp+010 04000 | ja AnyBitsSquareKaratsubaRecursive | jmp AnyBitsSquareLong
+    cmp D$esp+010 040000 | ja AnyBitsSquareKaratsubaRecursiveM
+    cmp D$esp+010  04000 | ja AnyBitsSquareKaratsubaRecursiveS
+    jmp AnyBitsSquareLong
 ;
 ;
-;
-[krtsbMin 0280]
-Proc AnyBitsSquareKaratsubaRecursive::
+[krtsbMin 0280][krtsbStackMin 08000]
+Proc AnyBitsSquareKaratsubaRecursiveM::
  ARGUMENTS @M3p @M3sz @M1p @M1sz
  Local @X0sz @X1sz @X1p @X0X0sz @X1X1sz @X1X1p @X0X1sz @X0X1p @Z1sz @Z1p @result; @X0X0p
  USES EBX ESI EDI
 
     mov eax D@M1sz | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
     mov ecx D@M3sz | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
-    UpdateBitSize D@M1p D@M1sz
+    UpdateBitSize D@M1p D@M1sz ; shrink input, but than clean output's uppers
+    shr eax 2 | cmp ecx eax | jb B0> | shr eax 1
+    cmp eax krtsbMin | ja C0>
+    call AnyBitsSquareLong D@M3p D@M3sz D@M1p D@M1sz
+    jmp P9>>
+C0:
+    cmp eax krtsbStackMin | ja C0>
+    call AnyBitsSquareKaratsubaRecursiveS D@M3p D@M3sz D@M1p D@M1sz
+    jmp P9>>
+
+B0: sub eax eax | jmp P9>>
+
+C0:
+; cleanup input ?
+;    mov eax D@M3sz | shr eax 3 | call FillMemory D@M3p eax 0
+
+    and D@X0X1p 0 | and D@Z1p 0 | and D@result 0
+
+;X0sz half+ X1sz half-
+    mov ebx D@M1sz | mov edi ebx
+    shr ebx 1 | ALIGN_ON 32 ebx
+    mov D@X0sz ebx | sub edi ebx
+    mov D@X1sz edi
+    shr ebx 3
+    mov eax D@M1p | add eax ebx | mov D@X1p eax
+
+; make x0*x0
+    mov ebx D@X0sz | shl ebx 1 | mov D@X0X0sz ebx
+;    move D@X0X0p D@M3p
+    shr ebx 3
+; do x0*x0
+    call AnyBitsSquareKaratsubaRecursiveM D@M3p D@X0X0sz D@M1p D@X0sz | test eax eax | je B1>>
+    UpdateBitSize D@M3p D@X0X0sz
+; make x1*x1
+    mov edi D@X1sz | shl edi 1 | mov D@X1X1sz edi
+    mov eax D@M3p | add eax ebx | mov D@X1X1p eax
+; do x1*x1
+    call AnyBitsSquareKaratsubaRecursiveM D@X1X1p D@X1X1sz D@X1p D@X1sz | test eax eax | je B1>>
+    UpdateBitSize D@X1X1p D@X1X1sz
+
+; x0+x1
+    mov eax D@X0sz | mov edx D@X1sz | cmp eax edx | jae L0> | mov eax edx
+L0: add eax 32 | mov D@X0X1sz eax | shr eax 3
+    call VAlloc eax | test eax eax | mov D@X0X1p eax | je B1>>
+    call AnyBitsAddition D@X0X1p D@X0X1sz D@X1p D@X1sz D@M1p D@X0sz | test eax eax | je B1>>
+    UpdateBitSize D@X0X1p D@X0X1sz
+; (x0+x1)^
+    mov eax D@X0X1sz | shl eax 1 | add eax 32 | mov D@Z1sz eax | shr eax 3
+    call VAlloc eax | test eax eax | mov D@Z1p eax | je B1>>
+    call AnyBitsSquareKaratsubaRecursiveM D@Z1p D@Z1sz D@X0X1p D@X0X1sz | test eax eax | je B1>>
+; - x1x1
+    call AnyBitsSubstractionSelf D@X1X1p D@X1X1sz D@Z1p D@Z1sz | test eax eax | je B1>>
+; - x0x0
+    call AnyBitsSubstractionSelf D@M3p D@X0X0sz D@Z1p D@Z1sz | test eax eax | je B1>
+    UpdateBitSize D@Z1p D@Z1sz
+; Z2 +Z1 +Z0
+    mov eax D@X0sz | mov edx D@M3sz | sub edx eax | shr eax 3 | add eax D@M3p
+    call AnyBitsAdditionSelf D@Z1p D@Z1sz eax edx | test eax eax | je B1>
+; clean output's uppers
+    mov edi D@M1sz | mov ecx D@M3sz | SHR edi 2 | SHR ecx 3 | add edi D@M3p | add ecx D@M3p
+    sub ecx edi | je L0> | sub eax eax | SHR ecx 2 | CLD | REP STOSD
+L0:
+    mov D@result 1
+B1:
+    call VFree D@Z1p
+    call VFree D@X0X1p
+
+    mov eax D@result
+EndP
+;
+;
+;
+Proc AnyBitsSquareKaratsubaRecursiveS::
+ ARGUMENTS @M3p @M3sz @M1p @M1sz
+ Local @X0sz @X1sz @X1p @X0X0sz @X1X1sz @X1X1p @X0X1sz @X0X1p @Z1sz @Z1p @result; @X0X0p
+ USES EBX ESI EDI
+
+    mov eax D@M1sz | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
+    mov ecx D@M3sz | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
+    UpdateBitSize D@M1p D@M1sz ; shrink input, but than clean output's uppers
     shr eax 2 | cmp ecx eax | jb B0> | shr eax 1
     cmp eax krtsbMin | ja C0>
     call AnyBitsSquareLong D@M3p D@M3sz D@M1p D@M1sz
@@ -2377,123 +2473,67 @@ C0:
 ;    move D@X0X0p D@M3p
     shr ebx 3
 ; do x0*x0
-    call AnyBitsSquareKaratsubaRecursive D@M3p D@X0X0sz D@M1p D@X0sz | test eax eax | je B1>>
+    call AnyBitsSquareKaratsubaRecursiveS D@M3p D@X0X0sz D@M1p D@X0sz | test eax eax | je B1>>
     UpdateBitSize D@M3p D@X0X0sz
 ; make x1*x1
     mov edi D@X1sz | shl edi 1 | mov D@X1X1sz edi
     mov eax D@M3p | add eax ebx | mov D@X1X1p eax
 ; do x1*x1
-    call AnyBitsSquareKaratsubaRecursive D@X1X1p D@X1X1sz D@X1p D@X1sz | test eax eax | je B1>>
+    call AnyBitsSquareKaratsubaRecursiveS D@X1X1p D@X1X1sz D@X1p D@X1sz | test eax eax | je B1>>
     UpdateBitSize D@X1X1p D@X1X1sz
 
 ; x0+x1
     mov eax D@X0sz | mov edx D@X1sz | cmp eax edx | jae L0> | mov eax edx
 L0: add eax 32 | mov D@X0X1sz eax | shr eax 3
-    call VAlloc eax | test eax eax | mov D@X0X1p eax | je B1>>
+    push 0 ; border
+    call SAlloc eax | test eax eax | mov D@X0X1p eax | je B1>>
     call AnyBitsAddition D@X0X1p D@X0X1sz D@X1p D@X1sz D@M1p D@X0sz | test eax eax | je B1>>
     UpdateBitSize D@X0X1p D@X0X1sz
 ; (x0+x1)^
     mov eax D@X0X1sz | shl eax 1 | add eax 32 | mov D@Z1sz eax | shr eax 3
-    call VAlloc eax | test eax eax | mov D@Z1p eax | je B1>>
-    call AnyBitsSquareKaratsubaRecursive D@Z1p D@Z1sz D@X0X1p D@X0X1sz | test eax eax | je B1>>
+    push 0 ; border
+    call SAlloc eax | test eax eax | mov D@Z1p eax | je B1>>
+    call AnyBitsSquareKaratsubaRecursiveS D@Z1p D@Z1sz D@X0X1p D@X0X1sz | test eax eax | je B1>>
 ; - x1x1
     call AnyBitsSubstractionSelf D@X1X1p D@X1X1sz D@Z1p D@Z1sz | test eax eax | je B1>>
 ; - x0x0
     call AnyBitsSubstractionSelf D@M3p D@X0X0sz D@Z1p D@Z1sz | test eax eax | je B1>
     UpdateBitSize D@Z1p D@Z1sz
 ; Z2 +Z1 +Z0
-;    mov eax D@M3sz | shr eax 3 | call FillMemory D@M3p eax 0
-;    call AnyBitsAdditionSelf D@X0X0p D@X0X0sz D@M3p D@M3sz | test eax eax | je B1>
     mov eax D@X0sz | mov edx D@M3sz | sub edx eax | shr eax 3 | add eax D@M3p
     call AnyBitsAdditionSelf D@Z1p D@Z1sz eax edx | test eax eax | je B1>
-;    mov eax D@X0sz | mov edx D@M3sz | shl eax 1 | sub edx eax | shr eax 3 | add eax D@M3p
-;    call AnyBitsAdditionSelf D@X1X1p D@X1X1sz eax edx | test eax eax | je B1>
+; clean output's uppers
+    mov edi D@M1sz | mov ecx D@M3sz | SHR edi 2 | SHR ecx 3 | add edi D@M3p | add ecx D@M3p
+    sub ecx edi | je L0> | sub eax eax | SHR ecx 2 | CLD | REP STOSD
+L0:
     mov D@result 1
 B1:
-    call VFree D@Z1p
-    call VFree D@X0X1p
-;    call VFree D@X1X1p
-;    call VFree D@X0X0p
-;    call VFree D@X1p
-
     mov eax D@result
 EndP
 ;
-;;
-Proc AnyBitsSquareKaratsubaRecursive::
- ARGUMENTS @M3p @M3sz @M1p @M1sz
- cLocal @X0sz @X1sz @X1p @X0X0sz @X0X0p @X1X1sz @X1X1p @X0X1sz @X0X1p @Z1sz @Z1p @result
- USES EBX ESI EDI
-
-    mov eax D@M1sz | test eax 00_11111 | jne B0> | shr eax 3 | je B0>
-    mov ecx D@M3sz | test ecx 00_11111 | jne B0> | shr ecx 3 | je B0>
-    UpdateBitSize D@M1p D@M1sz
-    shr eax 2 | cmp ecx eax | jb B0> | shr eax 1
-    cmp eax krtsbMin | ja C0>
-    call AnyBitsSquareLong D@M3p D@M3sz D@M1p D@M1sz
-    jmp P9>>
-B0: sub eax eax | jmp P9>>
-
-C0:
-;X0sz half+ X1sz half-
-    mov ebx D@M1sz | mov edi ebx
-    shr ebx 1 | ALIGN_ON 32 ebx
-    mov D@X0sz ebx | sub edi ebx
-    mov D@X1sz edi
-
-    shr ebx 3
-    mov eax D@M1p | add eax ebx | mov D@X1p eax
-
-; make x0*x0
-    mov ebx D@X0sz
-    shr ebx 2
-    call VAlloc ebx | test eax eax | mov D@X0X0p eax | je B1>>
-    shl ebx 3 | mov D@X0X0sz ebx ;| shr ebx 3
-; do x0*x0
-    call AnyBitsSquareKaratsubaRecursive D@X0X0p D@X0X0sz D@M1p D@X0sz | test eax eax | je B1>>
-    UpdateBitSize D@X0X0p D@X0X0sz
-; make x1*x1
-    mov edi D@X1sz
-    shr edi 2
-    call VAlloc edi | test eax eax | mov D@X1X1p eax | je B1>>
-    shl edi 3 | mov D@X1X1sz edi
-; do x1*x1
-    call AnyBitsSquareKaratsubaRecursive D@X1X1p D@X1X1sz D@X1p D@X1sz | test eax eax | je B1>>
-    UpdateBitSize D@X1X1p D@X1X1sz
-; x0+x1
-    mov eax D@X0sz | mov edx D@X1sz | cmp eax edx | jae L0> | mov eax edx
-L0: add eax 32 | mov D@X0X1sz eax | shr eax 3
-    call VAlloc eax | test eax eax | mov D@X0X1p eax | je B1>>
-    call AnyBitsAddition D@X0X1p D@X0X1sz D@X1p D@X1sz D@M1p D@X0sz | test eax eax | je B1>>
-    UpdateBitSize D@X0X1p D@X0X1sz
-; (x0+x1)^
-    mov eax D@X0X1sz | shl eax 1 | add eax 32 | mov D@Z1sz eax | shr eax 3
-    call VAlloc eax | test eax eax | mov D@Z1p eax | je B1>>
-    call AnyBitsSquareKaratsubaRecursive D@Z1p D@Z1sz D@X0X1p D@X0X1sz | test eax eax | je B1>>
-; - x1x1
-    call AnyBitsSubstractionSelf D@X1X1p D@X1X1sz D@Z1p D@Z1sz | test eax eax | je B1>>
-; - x0x0
-    call AnyBitsSubstractionSelf D@X0X0p D@X0X0sz D@Z1p D@Z1sz | test eax eax | je B1>
-    UpdateBitSize D@Z1p D@Z1sz
-; Z2 +Z1 +Z0
-;    mov eax D@M3sz | shr eax 3 | call FillMemory D@M3p eax 0
-    call AnyBitsAdditionSelf D@X0X0p D@X0X0sz D@M3p D@M3sz | test eax eax | je B1>
-    mov eax D@X0sz | mov edx D@M3sz | sub edx eax | shr eax 3 | add eax D@M3p
-    call AnyBitsAdditionSelf D@Z1p D@Z1sz eax edx | test eax eax | je B1>
-    mov eax D@X0sz | mov edx D@M3sz | shl eax 1 | sub edx eax | shr eax 3 | add eax D@M3p
-    call AnyBitsAdditionSelf D@X1X1p D@X1X1sz eax edx | test eax eax | je B1>
-    mov D@result 1
-B1:
-    call VFree D@Z1p
-    call VFree D@X0X1p
-    call VFree D@X1X1p
-    call VFree D@X0X0p
-;    call VFree D@X1p
-
-    mov eax D@result
-EndP
-;;
 ;
+
+[StackAllocMax 020000]
+; initialize dirty stack memory (pos & size aligned on 16)
+; ARGUMENT: size in bytes
+SAlloc:
+    sub eax eax | mov ecx D$esp+4
+    cmp ecx StackAllocMax | jbe L0> | RET 04
+L0: mov edx D$esp | add esp 8
+    ALIGN_ON 16 ecx
+L0: test esp 0F | je L0> | push 0 | jmp L0< ; align stack on 16
+
+L0: sub ecx &PAGE_SIZE | jl L0>
+    sub esp (&PAGE_SIZE -4) | push 0 | jmp L0< ; init stack pages
+L0: add ecx &PAGE_SIZE
+    sub esp ecx | add esp 4 | push 0 | mov eax esp
+    push edx | RET
+
+
+
+
+
+
 ;
 Proc AnyBitsMultiplicationKaratsubaRecursive::
  ARGUMENTS @M3p @M3sz @M2p @M2sz @M1p @M1sz

@@ -404,13 +404,14 @@ ________________________________________________________________________________
  M00_AnyBitsSUB32  2069          M00_AnyBitsNEG  2070            M00_AnyBitsNOT  2071
  M00_AnyBitsMULbin  2072         M00_AnyBitsMUL  2073            M00_AnyBitsMUL32  2074
  M00_AnyBitsSQ2  2075            M00_AnyBitsPOW  2076            M00_AnyBitsDIV  2077
- M00_AnyBitsDIV32  2078          M00_AnyBitsMOD  2079            M00_AnyBitsMOD32  2080
- M00_AnyBitsSQRoot  2081         M00_AnyBitsNRoot  2082          M00_AnyBitsSHL  2083
- M00_AnyBitsSHR  2084            M00_AnyBitsROL  2085            M00_AnyBitsROR  2086
- M00_AnyBitsFLTPrPtest  2087     M00_TestFunc0  2088             M00_TestFunc1  2089
- M00_TestFunc2  2090             M00_TestFunc3  2091             M00_TestFunc4  2092
- M00_TestFunc5  2093             M00_TestFunc6  2094             M00_TestFunc7  2095
- M00_TestFunc8  2096             M00_TestFunc9  2097             M00_About  2098]
+ M00_AnyBitsDIV32  2078          M00_AnyBitsMOD  2079            M00_AnyBitsGCD  2080
+ M00_AnyBitsMOD32  2081          M00_AnyBitsSQRoot  2082         M00_AnyBitsNRoot  2083
+ M00_AnyBitsSHL  2084            M00_AnyBitsSHR  2085            M00_AnyBitsROL  2086
+ M00_AnyBitsROR  2087            M00_AnyBitsFLTPrPtest  2088     M00_TestFunc0  2089
+ M00_TestFunc1  2090             M00_TestFunc2  2091             M00_TestFunc3  2092
+ M00_TestFunc4  2093             M00_TestFunc5  2094             M00_TestFunc6  2095
+ M00_TestFunc7  2096             M00_TestFunc8  2097             M00_TestFunc9  2098
+ M00_About  2099]
 ___________________________________________________________________________________________
 
 Proc MainWindowProc:
@@ -595,6 +596,8 @@ L0:
                mov ebx doAnyBitsDIV
             Else_If  D@wParam = M00_AnyBitsMOD
                mov ebx doAnyBitsMOD
+            Else_If  D@wParam = M00_AnyBitsGCD
+               mov ebx doAnyBitsGCD
             Else_If  D@wParam = M00_AnyBitsDIV32
                call OnAnyBitsDiv32Bit
             Else_If  D@wParam = M00_AnyBitsMOD32
@@ -2078,9 +2081,8 @@ DBGBP
 
 EndP
 ;
-
-
-
+;
+;
 Proc doAnyBitsMOD:
  cLocal @inSz1 @inMem1 @inSz2 @inMem2
 
@@ -2114,6 +2116,56 @@ L0:
 @BM:
     call VFree D@inMem2 | call VFree D@inMem1
 EndP
+;
+;
+;
+Proc doAnyBitsGCD:
+ cLocal @inSz1 @inMem1 @inSz2 @inMem2
+
+    call ChooseAndLoadFileA | test eax eax | je P9>>
+    ALIGN_ON 4 edx
+    mov D@inMem1 eax, D@inSz1 edx
+    call ChooseAndLoadFileA | test eax eax | je @BM
+    ALIGN_ON 4 edx
+    mov D@inMem2 eax, D@inSz2 edx
+DBGBP
+    updateByteSize D@inMem1 D@inSz1
+    updateByteSize D@inMem2 D@inSz2
+    mov eax D@inSz1 | cmp eax D@inSz2 | jae L0> | exchange D@inMem1 D@inMem2, D@inSz1 D@inSz2
+L0: move D$AnyBitsDIVQuotent D@inMem1, D$AnyBitsDIVQuotent+4 D@inSz1 | SHL D$AnyBitsDIVQuotent+4 3
+    move D$AnyBitsDIVDivizor D@inMem2, D$AnyBitsDIVDivizor+4 D@inSz2 | SHL D$AnyBitsDIVDivizor+4 3
+    mov D$JobReporterAddr reportAnyBitsGCD
+call SetStartTick
+    mov eax D@inSz1, edx D@inSz2
+    shl eax 3 | shl edx 3
+    call 'AnyBits.GCD' D@inMem2 edx D@inMem1 eax
+call SetEndTickReport
+    cmp eax 0 | jne L0>
+    call 'User32.MessageBoxA' D$WindowHandle "GCD Failure!" "GCD procedure:" &MB_ICONWARNING | jmp @BM
+L0: cmp eax 1 | jne L0>
+    call 'User32.MessageBoxA' D$WindowHandle "GCD not found!" "GCD procedure:" &MB_ICONINFORMATION | jmp @BM
+L0:
+; output reminder
+    cmp D@inMem1 eax | je L0> | exchange D@inMem1 D@inMem2
+L0: SHR edx 3 | mov D@inSz1 edx
+    call ChooseAndSaveFileA D@inMem1 D@inSz1
+@BM:
+    call VFree D@inMem2 | call VFree D@inMem1
+EndP
+;
+;
+Proc reportAnyBitsGCD:
+;DBGBP
+    call 'AnyBits.GetHighestBitPosition' D$AnyBitsDIVQuotent D$AnyBitsDIVQuotent+4 | push eax
+    ALIGN_UP 32 eax | mov D$AnyBitsDIVQuotent+4 eax
+    call 'AnyBits.GetHighestBitPosition' D$AnyBitsDIVDivizor D$AnyBitsDIVDivizor+4
+    pop edx | mov ecx eax | ALIGN_UP 32 ecx | mov D$AnyBitsDIVDivizor+4 ecx
+    cmp edx eax | jbe L0> | mov eax edx
+L0: call Dword2Decimal pReportBuffer eax | mov B$pReportBuffer+eax 0
+    call 'User32.SendMessageA', D$EDIT0_handle, &WM_SETTEXT, 0, pReportBuffer
+
+EndP
+;
 ;
 ;
 Proc OnAnyBitsAdd32Bit:

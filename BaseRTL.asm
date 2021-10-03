@@ -496,7 +496,7 @@ B1: call 'Kernel32.VirtualFree', edi, 0, &MEM_RELEASE
 B0: call 'Kernel32.CloseHandle', ebx | sub eax eax
 EndP
 
-
+;returns in EAX-Buffer EDX-BytesRead
 Proc LoadFileNameW2Mem::
  ARGUMENTS @pFileName
  USES ebx esi edi
@@ -975,11 +975,11 @@ Proc LogDumpStartTime::
  USES EBX
     mov ebx D@LogStruct
     call LogFileInit ebx | test eax eax | je P9>
-    sub esp 24
+    sub esp 28
     push 't:  '
     push 'Star'
     lea edx D$esp+8
-    call GetCurrentTime2String edx | mov D$esp+eax+8 0A0D | add eax 10 | mov edx esp
+    call GetCurrentTime2String edx | mov W$esp+eax+8 0A0D | add eax 10 | mov edx esp
     call LogAppendToBuffer ebx edx eax
     call LogFlushBuffer ebx
 EndP
@@ -989,11 +989,11 @@ Proc LogDumpEndTime::
  USES EBX
     mov ebx D@LogStruct
     call LogFileInit ebx | test eax eax | je P9>
-    sub esp 24
+    sub esp 28
     push '    '
     push 'End:'
     lea edx D$esp+8
-    call GetCurrentTime2String edx | mov D$esp+eax+8 0A0D | add eax 10 | mov edx esp
+    call GetCurrentTime2String edx | mov W$esp+eax+8 0A0D | add eax 10 | mov edx esp
     call LogAppendToBuffer ebx edx eax
     call LogFileClose ebx
 EndP
@@ -1525,3 +1525,37 @@ Proc ChooseAndSaveToFileNameAnsi::
     call VFree D@pFileNameA
     mov eax esi
 EndP
+
+;returns EAX=pMemory EDX=Size ; onError EAX=NULL
+Proc ChooseAndLoadFileByNameWide::
+ Arguments @ParentWindowHandle
+ cLocal @pFileNameW
+ USES ESI EDI
+
+    sub esi esi | sub edi edi
+    call ChooseFileByNameWide D@ParentWindowHandle
+    test eax eax | je P9> |  mov D@pFileNameW eax
+    call VFree EDX
+    call LoadFileNameW2Mem D@pFileNameW
+    mov esi eax | mov edi edx
+    call VFree D@pFileNameW
+    mov eax esi | mov edx edi
+EndP
+
+;returns EAX=BytesWritten ; onError EAX=NULL
+Proc ChooseAndSaveToFileNameWide::
+ Arguments @ParentWindowHandle @pMem @sz
+ cLocal @pFileNameW
+ USES ESI
+
+    sub esi esi
+    call ChooseFileNameWide D@ParentWindowHandle
+    test eax eax | je P9> |  mov D@pFileNameW eax
+    call VFree EDX
+    call WriteMem2FileNameW D@pFileNameW D@pMem D@sz
+    mov esi eax
+    call VFree D@pFileNameW
+    mov eax esi
+EndP
+
+
