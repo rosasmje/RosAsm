@@ -315,6 +315,26 @@ TITLE rtlfuncs
 ____________________________________________________________________________________________
 
 
+;Arguments @pString, @DWORD
+D2H:
+ cld
+ push edi
+ mov edi D$esp+08 | mov edx D$esp+0C | mov ecx 4
+ rol edx 8
+B0:
+ mov al dl | mov ah dl
+ shr al 04 | and ah 0F | or eax 03030
+ cmp al 03A | jb B1> | add al 07
+B1:
+ cmp ah 03A | jb B1> | add ah 07
+B1:
+ stosw
+ rol edx 08 | dec ecx | jne B0<
+; mov B$edi 0
+ mov eax 08
+ pop edi
+ ret 08
+;
 
 ; DECIMAL conversions
 Proc Dword2Decimal: ;ritern sLen
@@ -1024,7 +1044,7 @@ L1: call D@MsgBoxAadr D$WindowHandle LogMBoxErTe LogMBoxErTl &MB_ICONERROR__&MB_
     call GetTime
     lea edi D@nam
     mov D$edi 'Log', D$edi+8 '   .', D$edi+12 'txt' | lea edx D$edi+3
-    call 'BaseCodecs.D2H' edx eax
+    call D2H edx eax
     jmp L0<<
 E1: call UnloadDLL esi ; once loaded U32, it won't unload..
     sub eax eax
