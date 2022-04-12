@@ -3837,6 +3837,7 @@ EndP
 
 TITLE GCDs
 
+
 ALIGN 16
 
 ; returns: EAX=0 params error: 32bit unaligned memory size or subsequent procs fails;
@@ -3872,6 +3873,31 @@ L0:
 E0:
     sub eax eax ; params ERROR case
 EndP
+
+
+
+ALIGN 4
+
+; EAX=1: no GCD; EAX=0: numbers are same; else EAX is GCD
+Proc GCD32::
+ ARGUMENTS @Num32B @Num32A
+
+    mov eax D@Num32A | mov ecx D@Num32B | cmp eax ecx | jne L0>
+    mov eax 0 | jmp P9> ; same nums
+L0: ja L1> | xchg eax ecx | jmp L1>
+; eax > ecx
+L0:
+    sub edx edx | DIV ecx | mov eax ecx | mov ecx edx
+L1:
+    cmp ecx 0 | je P9> ; on 0, other is GCD. even on start, by convention.
+    cmp ecx 1 | jne L0<
+
+L2: mov eax 1 ; no GCD
+
+EndP
+
+
+
 
 
 

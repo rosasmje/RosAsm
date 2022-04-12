@@ -3222,6 +3222,81 @@ EndP
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 TITLE rtlfuncs
 ____________________________________________________________________________________________
 
@@ -4404,7 +4479,7 @@ Proc makeBigNumFromPrimes:
  ARGUMENTS @nBits @StartPrime
  cLocal @BitSz
  USES ebx esi edi
-    mov ebx D@nBits | shr ebx 3 | add ebx 4
+    mov ebx D@nBits | shr ebx 3 | add ebx 8
     call VAlloc ebx | mov esi eax | test eax eax | je @BM
     call VAlloc ebx | mov edi eax | test eax eax | je @BM
 
@@ -4414,7 +4489,7 @@ L0:
 L1:
     mov eax D@BitSz | add eax 32
     call 'AnyBits.AnyBitsMul32Bit' edi eax ebx esi D@BitSz | test eax eax | je @BM
-    shl eax 3 | mov D@BitSz eax | xchg esi edi | cmp eax D@nBits | jbe L0<
+    shl eax 3 | mov D@BitSz eax | xchg esi edi | cmp eax D@nBits | jb L0<
     ;mov ebx D@BitSz | shr ebx 3
     ;call 'BaseRTL.WriteMem2FileNameA' {"NumMulDUMP1",0} edi ebx
     ;call 'BaseRTL.WriteMem2FileNameA' {"NumMulDUMP2",0} esi ebx
