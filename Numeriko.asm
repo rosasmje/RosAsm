@@ -1384,6 +1384,52 @@ L0: BT D$esi ecx | jc L1> | inc eax
 L1: inc ecx | cmp ecx 080000000 | jb L0< ; jno..
 EndP
 
+; returns Prime candidate count ; error: -1
+; makes given size sieve (min 32bit, max 2^31bit) starting from given EVEN anybit number
+Proc Bit16PrimesSieveRangeFromAnyBitNumber::
+ ARGUMENTS @SieveMem @SieveMemSz @AnyBits @AnyBitsSz
+ USES EBX ESI EDI
+;DBGBP
+    or eax 0-1
+    mov edx D@SieveMemSz | test edx 00_11111 | jne P9>> ; 32 align req
+    cmp edx 080000000 | jae P9>> | shr edx 3 | je P9>>
+    mov edx D@AnyBitsSz | test edx 00_11111 | jne P9> ; 32 align
+    shr edx 3 | je P9>
+    mov edx D@AnyBits | test D$edx 1 | jne P9> ; EVEN must
+    mov esi D@SieveMem | mov edi Bit16Primes
+    sub ecx ecx | mov ebx 1
+L0:
+    movzx eax B$edi+ecx | shl eax 1 | add eax EBX | cmp eax 0FFF1 | ja L9>
+    mov ebx eax | inc ecx
+    push ecx
+    call AnyBitsMod32Bit D@AnyBits D@AnyBitsSz ebx
+    pop ecx | test eax eax | je P9>
+    mov eax 0 | test edx edx | jne L2> | mov edx ebx
+L2: sub eax edx | add eax ebx | jmp L3>
+L1:
+    add eax ebx | jb L0<
+L3: test eax 1 | je L1<
+    mov edx eax | shr edx 1 | cmp edx D@SieveMemSz | jae L0< ; max bit
+    BTS D$esi edx
+    jmp L1<
+L9:
+    mov ebx D@SieveMemSz
+    sub eax eax | sub ecx ecx
+L0: BT D$esi ecx | jc L1> | inc eax
+L1: inc ecx | cmp ecx ebx | jb L0< ; jno..
+EndP
+
+;returns True/false
+Proc IsNumberNonPrimeInLittleSieve::
+ ARGUMENTS @pSieve @szSieve @SieveBaseLowDword @NumberLowDword
+
+    mov edx D@NumberLowDword, eax D@szSieve | SHL eax 1 | sub edx D@SieveBaseLowDword | cmp edx eax | jae L8>
+    mov eax D@pSieve | shr edx 1
+    BT D$eax edx | mov eax 0 | adc eax 0 | jmp P9>
+L8: sub eax eax
+EndP
+
+
 ; returns count
 Proc Bit32PrimesSieveAny4GbRange::
  ARGUMENTS @mB32Primes @SieveMem @inMem @inMemSz
