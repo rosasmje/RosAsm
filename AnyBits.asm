@@ -3844,9 +3844,12 @@ ALIGN 16
 ; EAX=1, no GCD; EAX=3 numbers are same!; else EAX=GCDptr, EDX=GCDbitSize
 Proc GCD::
  ARGUMENTS @pAnyBits2 @nAnyBits2 @pAnyBits1 @nAnyBits1
-
+ USES edi
     mov eax D@nAnyBits1 | test eax 00_11111 | jne E0>> | shr eax 3 | je E0>>
     mov ecx D@nAnyBits2 | test ecx 00_11111 | jne E0>> | shr ecx 3 | je E0>>
+
+    updateBitSize D@pAnyBits1 D@nAnyBits1
+    updateBitSize D@pAnyBits2 D@nAnyBits2
 
     call AnyBitsCompare D@pAnyBits2 D@nAnyBits2 D@pAnyBits1 D@nAnyBits1 | test eax eax | je E0>>
     cmp eax 3 | je P9>> | cmp eax 1 | je L0>
@@ -3857,14 +3860,21 @@ L0:
     mov eax D@pAnyBits1, edx D@nAnyBits1 ; on 0, other is GCD. by convention.
     jmp P9>>
 L0:
+    cmp D@nAnyBits2 32 | je L1>
+    call AnyBitsModulus D@pAnyBits2 D@nAnyBits2 D@pAnyBits1 D@nAnyBits1 | test eax eax | je E0>>
     updateBitSize D@pAnyBits1 D@nAnyBits1
-    updateBitSize D@pAnyBits2 D@nAnyBits2
-L0:
-    call AnyBitsModulus D@pAnyBits2 D@nAnyBits2 D@pAnyBits1 D@nAnyBits1 | test eax eax | je E0>
-    updateBitSize D@pAnyBits1 D@nAnyBits1
-    call GetHighestBitPosition D@pAnyBits1 D@nAnyBits1 | cmp eax 0 | je L0>
+    call GetHighestBitPosition D@pAnyBits1 D@nAnyBits1 | cmp eax 0 | je L0>>
     exchange D@pAnyBits1 D@pAnyBits2, D@nAnyBits1 D@nAnyBits2
     jmp L0<
+L1:
+    mov eax D@pAnyBits2 | call AnyBitsMod32Bit D@pAnyBits1 D@nAnyBits1 D$eax | test eax eax | je E0>>
+    mov ecx D@nAnyBits1 | mov edi D@pAnyBits1 | SHR ecx 5 | sub eax eax | REP STOSD
+    mov edi D@pAnyBits1 | mov D$edi edx | mov D@nAnyBits1 32 | cmp edx 1 | jbe L0>
+;    exchange D@pAnyBits1 D@pAnyBits2, D@nAnyBits1 D@nAnyBits2
+    mov eax D@pAnyBits1 | mov edx D@pAnyBits2
+    call GCD32 D$edx D$eax | cmp eax 1 | ja L1> | xchg eax edx
+L1: mov ecx D@pAnyBits1 | mov edi D@pAnyBits2 | mov D$ecx edx | mov D$edi eax
+    jmp L0>
 L0:
 ; 0 or 1 ?
     sub edx edx | mov eax D@pAnyBits1 | mov eax D$eax | cmp eax 1 | je P9> ; on 1, say no GCD
@@ -3878,20 +3888,20 @@ EndP
 
 ALIGN 4
 
-; EAX=1: no GCD; EAX=0: numbers are same; else EAX is GCD
+; EAX=1: no GCD EDX=lastDivisor; EAX=0: numbers are same; else EAX=GCD,EDX=0
 Proc GCD32::
  ARGUMENTS @Num32B @Num32A
 
-    mov eax D@Num32A | mov ecx D@Num32B | cmp eax ecx | jne L0>
+    sub edx edx | mov eax D@Num32A | mov ecx D@Num32B | cmp eax ecx | jne L0>
     mov eax 0 | jmp P9> ; same nums
 L0: ja L1> | xchg eax ecx | jmp L1>
 ; eax > ecx
 L0:
     sub edx edx | DIV ecx | mov eax ecx | mov ecx edx
 L1:
-    cmp ecx 0 | je P9> ; on 0, other is GCD. even on start, by convention.
+    cmp ecx 0 | je P9> ; on 0, EAX is GCD. even on start, by convention.
     cmp ecx 1 | jne L0<
-
+    mov edx eax ; last divisor
 L2: mov eax 1 ; no GCD
 
 EndP

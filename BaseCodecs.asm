@@ -1630,6 +1630,8 @@ ________________________________________________________________________________
 
 TITLE HEXconversions
 
+ALIGN 16
+
 ;Arguments @pString @byte
 B2H::
  mov al B$esp+04 | mov edx D$esp+08
@@ -1664,7 +1666,7 @@ B1:
  pop edi
  ret 08
 
-ALIGN 16
+ALIGN 4
 ;Arguments @pString, @DWORD
 D2H::
  cld
@@ -1736,7 +1738,7 @@ proc AnyBits2HexA::
     mov eax edi | sub eax D@pString
  EndP
 
-ALIGN 16
+ALIGN 8
 ; ecx=bytesCnt, esi=pSource, edi=pString
 iBin2HexA::
  cld
@@ -1752,7 +1754,7 @@ B1:
  ret
 
 
-ALIGN 16
+ALIGN 8
 proc Binary2HexA::
  Arguments @dest @source @BytesCount
  USES esi edi
@@ -1851,7 +1853,7 @@ proc AnyBits2HexA_T::
  EndP
 
 
-ALIGN 16
+ALIGN 8
 ; ecx=bytesCnt, esi=pSource, edi=pString
 iBIN2HEX_TRUNCATED:
  cld
@@ -1917,7 +1919,7 @@ B4: ;mov B$edi 0; last NULL
 
 
 
-ALIGN 16
+ALIGN 8
 ; returns char count
 proc Binary2BitsA::
  Arguments @pString @source @BytesCount
@@ -1982,7 +1984,7 @@ B3: inc edx
  ret 08
 
 
-ALIGN 16
+ALIGN 8
 ;nBits must be 32bit-aligned ; returns char count
 proc AnyBits2BitsA::
  Arguments @pString @pBits @nBits
@@ -2001,7 +2003,7 @@ B3: inc edi | dec edx | jne B1<
 EndP
 
 
-ALIGN 16
+ALIGN 8
 ;nBits must be 32bit-aligned ; returns char count
 proc AnyBits2BitsA_T::
  Arguments @pString @pBits @nBits
@@ -2033,7 +2035,7 @@ EndP
 
 
 
-ALIGN 4
+ALIGN 8
 ;Arguments dest, pString, CharCount ; returns Bits count
 ; skips '_'
 proc BitsA2Binary::
@@ -2049,6 +2051,30 @@ B0: LODSB
     cmp AL '0' | jne B1>
     BTR D$edi edx | jmp B2>
 B1: cmp AL '1' | jne B4>
+    BTS D$edi edx
+B2: inc edx
+B3: dec ecx | jne B0<
+;B4: test edx 00_111 | je B4> | and edx ( NOT 7); incomplete byte? let program decide
+B4: mov eax edx
+EndP
+
+
+ALIGN 8
+;Arguments dest, pString, CharCount ; returns Bits count
+; skips '_'
+proc BitsW2Binary::
+ Arguments @dest @pString @CharCount
+ USES esi edi
+
+    CLD
+    sub eax eax | sub edx edx
+    mov ecx D@CharCount | test ecx ecx | jle P9>
+    mov esi D@pString | mov edi D@dest
+B0: LODSW
+    cmp AX '_' | je B3> ; skip '_'
+    cmp AX '0' | jne B1>
+    BTR D$edi edx | jmp B2>
+B1: cmp AX '1' | jne B4>
     BTS D$edi edx
 B2: inc edx
 B3: dec ecx | jne B0<
@@ -2102,7 +2128,7 @@ B3:
  ret 08
 
 
-ALIGN 4
+ALIGN 8
 ;Arguments pBits memory(dword aligned), pString, CharCount ; returns Bits count
 ; starts from last chars. (0,1) no other char expected
 proc BitsA2AnyBits::
@@ -2121,11 +2147,32 @@ B2: inc edx | dec ecx | jne B0<
 ;B4: test edx 00_111 | je B4> | and edx ( NOT 7) ; incomplete byte?
 B4: mov eax edx
 EndP
+
+
+ALIGN 8
+;Arguments pBits memory(dword aligned), pString, CharCount ; returns Bits count
+; starts from last chars. (0,1) no other char expected
+proc BitsW2AnyBits::
+ Arguments @pBits @pString @nChars
+ USES esi edi
+
+    sub eax eax | sub edx edx
+    mov ecx D@nChars | test ecx ecx | jle P9>
+    mov edi D@pBits | mov esi D@pString
+B0: mov AX W$esi+ecx*2-2
+    cmp AX '0' | jne B1>
+    BTR D$edi edx | jmp B2>
+B1: cmp AX '1' | jne B4>
+    BTS D$edi edx
+B2: inc edx | dec ecx | jne B0<
+;B4: test edx 00_111 | je B4> | and edx ( NOT 7) ; incomplete byte?
+B4: mov eax edx
+EndP
 ;
 ;
 ;
 ;
-ALIGN 4
+ALIGN 8
 ;Arguments pBits memory(dword aligned), pString, CharCount
 ; returns Bits count (8 aligned) ; req outmem size (3/8 + 4)
 ; starts from last chars. (0..7) no other char expected
@@ -2202,7 +2249,7 @@ B4: mov eax edi | sub eax D@pBits | SHL eax 3
 EndP
 
 
-ALIGN 4
+ALIGN 8
 ;Arguments pString, pBits, nBits (8! aligned),  ; returns Chars count
 ; starts from last chars. (0..7) no other char expected
 ; pBits will untouched. decoded buffer can have 1 or 2 more null byte at end.
@@ -2342,9 +2389,12 @@ ________________________________________________________________________________
 TITLE DecimalConversion
 ____________________________________________________________________________________________
 
+ALIGN 8
 AnyBits2Decimals::
     cmp D$esp+0C 128 | ja AnyBits2Decimals9x
 
+
+ALIGN 8
 Proc AnyBits2Decimals1x:: ;ritern sLen
  ARGUMENTS @pDecimalString @pBits @nBits
  USES EBX ESI EDI
@@ -2376,6 +2426,7 @@ L0: mov eax edi
 EndP
 
 
+ALIGN 8
 Proc AnyBits2Decimals9x:: ;ritern sLen
  ARGUMENTS @pDecimalString @pBits @nBits
  USES EBX ESI EDI
@@ -2415,9 +2466,12 @@ EndP
 ;
 ;
 ;
+ALIGN 8
 AnyDecimals2Bits::
     cmp D$esp+08 128 | ja AnyDecimals2Bits9x
 
+
+ALIGN 8
 ; returns nBits actual size (32bit-aligned) or NULL on Error.
 ; if no ERROR, ECX = processed chars
 ; nBits must be DWORD (32bit) aligned
@@ -2475,6 +2529,7 @@ L0: mov eax ebx | sub eax D@pBits | SHL eax 3 | mov ecx esi | sub ecx D@pDecimal
 EndP
 
 
+ALIGN 8
 ; returns Bits size (32bit-aligned) or NULL on Error.
 ; nBits must be DWORD (32bit) aligned
 ; Bits_buffer will be cleaned, so it can be dirty
@@ -2571,6 +2626,7 @@ EndP
 
 
 
+ALIGN 8
 ; returns nBits actual size (32bit-aligned) or NULL on Error.
 ; nBits must be DWORD (32bit) aligned
 ; Bits_buffer will be cleaned, so it can be dirty
@@ -2630,8 +2686,7 @@ EndP
 
 
 
-
-
+ALIGN 8
 ; returns EAX=nBitsInteger EDX=nBitsFractional (32bit-aligned) ; on Error EAX=0; ECX=0-1 on overflow
 Proc AnyRationalDecimal2RationalBits::
  ARGUMENTS @pBits @nBits @pDecimalString
@@ -2695,7 +2750,7 @@ L9:
 EndP
 
 
-
+ALIGN 8
 ; returns 0 on params_Error, else count of chars
 Proc AnyRationalBits2RationalDecimal::
  ARGUMENTS @pDecimalString @pBits @nBitsIntegral @nBitsFractional
@@ -2709,7 +2764,9 @@ Proc AnyRationalBits2RationalDecimal::
     add eax ebx
 EndP
 
- ; returns 0 on params_Error, else count of fraction decimals
+
+ALIGN 8
+; returns 0 on params_Error, else count of fraction decimals
 ; Parameters Must be 32Bit aligned
 Proc AnyFractionalBits2DecimalFraction::
  ARGUMENTS @pDecimal @pAnyBits @nAnyBits
@@ -2747,6 +2804,75 @@ L9: mov B$edi 0 | sub edi D@pDecimal | mov eax edi
     ; Returns decimal's length in bytes
 EndP
 
+
+
+ALIGN 4
+;returns sLen
+Proc Dword2Decimal::
+ ARGUMENTS @pDecimalString @dword
+ USES EDI
+
+    mov eax D@dword, edx 0, ecx 10, edi D@pDecimalString
+L0:
+    div ecx | or dl 030 | mov B$edi dl | inc edi | sub edx edx
+    test eax eax | jne L0<
+; invert str
+    mov ecx D@pDecimalString | sub edi ecx | lea edx D$ecx+edi-1
+L0: cmp ecx edx | jae L0>
+    mov al B$ecx, ah B$edx, B$ecx ah, B$edx al | inc ecx | dec edx | jmp L0<
+L0: mov eax edi
+EndP
+
+
+ALIGN 4
+;returns sLen
+Proc Qword2Decimal::
+ ARGUMENTS @pDecimalString @QwordLo @QwordHi
+ USES EBX ESI EDI
+
+    mov eax D@QwordLo, edx D@QwordHi, ecx 10, edi D@pDecimalString
+; double division
+L0:
+    cmp edx ecx | jb L1>
+    mov ebx eax, eax edx
+    sub edx edx | div ecx | mov esi eax
+    mov eax ebx | div ecx | or dl 030 | mov B$edi dl | inc edi | mov edx esi
+    jmp L0<
+L1:
+    div ecx | or dl 030 | mov B$edi dl | inc edi | sub edx edx
+    test eax eax | jne L1<
+; invert str
+    mov ecx D@pDecimalString | sub edi ecx | lea edx D$ecx+edi-1
+L0: cmp ecx edx | jae L0>
+    mov al B$ecx, ah B$edx, B$ecx ah, B$edx al | inc ecx | dec edx | jmp L0<
+L0: mov eax edi
+EndP
+
+
+ALIGN 4
+;returns sLen
+Proc pQword2Decimal::
+ ARGUMENTS @pDecimalString @pQword
+ USES EBX ESI EDI
+
+    mov eax D@pQword, edx D$eax+4, eax D$eax, ecx 10, edi D@pDecimalString
+; double division
+L0:
+    cmp edx ecx | jb L1>
+    mov ebx eax, eax edx
+    sub edx edx | div ecx | mov esi eax
+    mov eax ebx | div ecx | or dl 030 | mov B$edi dl | inc edi | mov edx esi
+    jmp L0<
+L1:
+    div ecx | or dl 030 | mov B$edi dl | inc edi | sub edx edx
+    test eax eax | jne L1<
+; invert str
+    mov ecx D@pDecimalString | sub edi ecx | lea edx D$ecx+edi-1
+L0: cmp ecx edx | jae L0>
+    mov al B$ecx, ah B$edx, B$ecx ah, B$edx al | inc ecx | dec edx | jmp L0<
+L0: mov eax edi
+EndP
+
 ____________________________________________________________________________________________
 
 ; copied funcs from AnyBits for Dll independency
@@ -2757,7 +2883,7 @@ ________________________________________________________________________________
     call GetEffectiveHighBitSz32 | shr eax 3 | mov #2 eax ]
 
 ; EAX=BITsz EDX=pBITs
-GetEffectiveHighBitSz32::
+GetEffectiveHighBitSz32:
     shr eax 3 | add eax edx
 L0: sub eax 4 | cmp eax edx | jb L0> ; AnyBits is 0 -> 32BIT.
     cmp D$eax 0 | je L0<

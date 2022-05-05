@@ -4479,6 +4479,7 @@ Proc makeBigNumFromPrimes:
  ARGUMENTS @nBits @StartPrime
  cLocal @BitSz
  USES ebx esi edi
+    sub esi esi | sub edi edi
     mov ebx D@nBits | shr ebx 3 | add ebx 8
     call VAlloc ebx | mov esi eax | test eax eax | je @BM
     call VAlloc ebx | mov edi eax | test eax eax | je @BM
