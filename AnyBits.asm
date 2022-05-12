@@ -924,6 +924,7 @@ L0: ;firstly square every dword, so no need to clean buffer
     mov ecx D@nAnyBits2 | SHR ecx 3 | add ecx D@pAnyBits2 | sub ecx edi | je L0>
     sub eax eax | SHR ecx 2 | CLD | REP STOSD
 L0:
+    cmp D@nAnyBits1 32 | je L9> ; for 32bit job done
     mov esi D@pAnyBits1 | add esi 4 ; this excludes last dword
 ALIGN 8
 L0: mov ecx D$esi-4 | test ecx ecx | je L1>
@@ -957,7 +958,7 @@ L5: add ebx 4 | add edi 4 | cmp ebx D@upBorder1 | jb L4<
 L1:
     add esi 4 | add D@pAnyBits2 4 ; 32bit SHIFT
     cmp esi D@upBorder1 | jb L0<
-
+L9:
     mov eax &TRUE
 EndP
 ;
