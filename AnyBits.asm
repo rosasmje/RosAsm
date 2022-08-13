@@ -3696,7 +3696,7 @@ EndP
 ;
 Proc AnyBitsNRootBig::
  Arguments @pBits @nBits @NRoot
- cLocal @nSqrBits @pSqrBits @nSqrBits1 @pSqrBits1 @pBits1 @tnSqrBits @tpSqrBits @tnBits @tpBits @nSqSqr @SqSqr
+ cLocal @nSqrBits @pSqrBits @nSqrBits1 @pSqrBits1 @pBits1 @tnSqrBits @tpSqrBits @tnBits @tpBits @nSqSqr @SqSqr @lastdo
  USES EBX ESI EDI
 
     sub ebx ebx
@@ -3749,6 +3749,7 @@ L0:
     mov eax D@pBits1, eax D$eax | cmp eax D@NRoot | ja L1>
     mov edx D@nSqrBits | shr edx 3 | cmp edi edx | jne L5<<
     cmp eax D@NRoot | JB L5<< ; if = do last average
+    cmp D@lastdo 0 | jne L5<< | or D@lastdo 1
 L1:
     mov eax D@NRoot | dec eax
     mov esi D@tnSqrBits | add esi 32
