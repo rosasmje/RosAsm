@@ -435,38 +435,47 @@ L0: inc esi
 L1: sub edi D@pout | mov eax edi
 EndP
 
+; returns converted Bytes count or 0 for error
+; in/out buffer size in Bytes
 Proc BaseHex2iBinaryDecode::
- ARGUMENTS @pout, @iBinSZ @pin, @insz
+ ARGUMENTS @pout, @outSz @pin, @inSz
  USES ebx esi edi
 
     sub eax eax
-    mov ecx D@insz, esi D@pin, edi D@pout | lea ebx D$esi+ecx
-    dec esi | mov ecx D@iBinSZ
+    mov esi D@pin, ebx esi | add ebx D@inSz
+; skip CR,LF,SPACE only at start
+    dec esi
 L3: inc esi
-    cmp ebx esi | jbe L1>
-    movzx edx B$esi | mov ah B$edx+tbase16
-    cmp ah 0FE | je L3< ; skip only before first!
-    cmp ah 0FF | je L1> ; to end
-    jmp L2>
-ALIGN 16
-L0: inc esi
-    cmp ebx esi | jbe L1>
-    movzx edx B$esi | mov ah B$edx+tbase16
-    cmp ah 0FE | je L1> ; NO skip!
-    cmp ah 0FF | je L1> ; to end
-L2: shl ah 4
-    inc esi
-    cmp ebx esi | jbe L1>
-    movzx edx B$esi | mov al B$edx+tbase16
-    cmp al 0FE | je L1> ; NO skip!
-    cmp al 0FF | je L1> ; to end
-    or al ah
+    cmp ebx esi | jbe E1>
+    movzx edx B$esi | mov AL B$edx+tbase16
+    cmp AL 0FE | je L3<
+    cmp AL 0FF | je E1> ; err
+; precount good HexA
+    mov ecx esi
+    dec ecx
+L3: inc ecx
+    cmp ebx ecx | jbe L0>
+    movzx edx B$ecx | mov AL B$edx+tbase16
+    cmp AL 0FE | je L0>
+    cmp AL 0FF | jne L3<
+L0: sub ecx esi
+    cmp ecx 0 | je E1>
+    test ecx 1 | jnz E1> ; not Even chars
+    shr ecx 1
+    cmp ecx D@outSz | ja E1> ; outbuff is small
+    mov D@outSz ecx
+    mov edi D@pout
+L0:
+    movzx edx B$esi | movzx ebx B$esi+1
+    mov ah B$edx+tbase16 | mov al B$ebx+tbase16
+    shl ah 4 | or al ah
     mov B$edi+ecx-1 al
+    add esi 2
     dec ecx | jne L0<
-    mov ecx D@iBinSZ | add edi ecx
-    jmp L3<
+    mov eax D@outSz
+    jmp P9>
 
-L1: sub edi D@pout | mov eax edi
+E1: sub eax eax ; error case
 EndP
 
 

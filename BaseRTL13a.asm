@@ -378,40 +378,40 @@ INT 3
 ___________________________________________________________________________________________
 ; These menu equates are given by the menu editor ([ClipBoard]):
 
-[M00_Menu  2000                  M00_New  2001                   M00_Open  2002
+ [M00_Menu  2000                  M00_New  2001                   M00_Open  2002
  M00_Save  2003                  M00_Save_As  2004               M00_Stop_JobThread  2005
  M00_Relocate_Executable  2006   M00_BuildRelocFromPointers  2007    M00_CopyDamagedFile  2008
  M00_RtlDecompress  2009         M00_InverseFileBytes  2010      M00_Exit  2011
  M00_Undo  2012                  M00_Cut  2013                   M00_Copy  2014
  M00_Paste  2015                 M00_Delete  2016                M00_Select_All  2017
- M00_Bin2Hex  2018               M00_Hex2Bin  2019               M00_Bin2HexBytes  2020
- M00_HexBytes2Bin  2021          M00_Bin2HexWords  2022          M00_HexWords2Bin  2023
- M00_Bin2HexDwords  2024         M00_HexDwords2Bin  2025         M00_Bin2HexQwords  2026
- M00_HexQwords2Bin  2027         M00_Bin2HexOwords  2028         M00_HexOwords2Bin  2029
- M00_Bin2BitsA  2030             M00_BitsA2Bin  2031             M00_AnyBits2BitsA  2032
- M00_BitsA2AnyBits  2033         M00_AnyBits2OctalsA  2034       M00_OctalsA2AnyBits  2035
- M00_Bin2Dec  2036               M00_Dec2Bin  2037               M00_RatioBits2RatioDecs  2038
- M00_RatioDecs2RatioBits  2039   M00_Bytes2Decimals  2040        M00_Decimals2Bytes  2041
- M00_Words2Decimals  2042        M00_Decimals2Words  2043        M00_Dwords2Decimals  2044
- M00_Decimals2Dwords  2045       M00_Qwords2Decimals  2046       M00_Decimals2Qwords  2047
- M00_Owords2Decimals  2048       M00_Decimals2Owords  2049       M00_Base24Encode  2050
- M00_Base24Decode  2051          M00_Base41Encode  2052          M00_Base41Decode  2053
- M00_Base53Encode  2054          M00_Base53Decode  2055          M00_Base64Encode  2056
- M00_Base64Decode  2057          M00_Base75Encode  2058          M00_Base75Decode  2059
- M00_Base85Encode  2060          M00_Base85Decode  2061          M00_Base94Encode  2062
- M00_Base94Decode  2063          M00_Base62Encode  2064          M00_Base62Decode  2065
- M00_AnyBitsADD  2066            M00_AnyBitsADD32  2067          M00_AnyBitsSUB  2068
- M00_AnyBitsSUB32  2069          M00_AnyBitsNEG  2070            M00_AnyBitsNOT  2071
- M00_AnyBitsMULbin  2072         M00_AnyBitsMUL  2073            M00_AnyBitsMUL32  2074
- M00_AnyBitsSQ2  2075            M00_AnyBitsPOW  2076            M00_AnyBitsDIV  2077
- M00_AnyBitsDIV32  2078          M00_AnyBitsMOD  2079            M00_AnyBitsGCD  2080
- M00_AnyBitsMOD32  2081          M00_AnyBitsSQRoot  2082         M00_AnyBitsNRoot  2083
- M00_AnyBitsSHL  2084            M00_AnyBitsSHR  2085            M00_AnyBitsROL  2086
- M00_AnyBitsROR  2087            M00_AnyBitsFLTPrPtest  2088     M00_TestFunc0  2089
- M00_TestFunc1  2090             M00_TestFunc2  2091             M00_TestFunc3  2092
- M00_TestFunc4  2093             M00_TestFunc5  2094             M00_TestFunc6  2095
- M00_TestFunc7  2096             M00_TestFunc8  2097             M00_TestFunc9  2098
- M00_About  2099]
+ M00_Bin2Hex  2018               M00_Hex2Bin  2019               M00_AnyBits2HexA  2020
+ M00_HexA2AnyBits  2021          M00_Bin2HexBytes  2022          M00_HexBytes2Bin  2023
+ M00_Bin2HexWords  2024          M00_HexWords2Bin  2025          M00_Bin2HexDwords  2026
+ M00_HexDwords2Bin  2027         M00_Bin2HexQwords  2028         M00_HexQwords2Bin  2029
+ M00_Bin2HexOwords  2030         M00_HexOwords2Bin  2031         M00_Bin2BitsA  2032
+ M00_BitsA2Bin  2033             M00_AnyBits2BitsA  2034         M00_BitsA2AnyBits  2035
+ M00_AnyBits2OctalsA  2036       M00_OctalsA2AnyBits  2037       M00_Bin2Dec  2038
+ M00_Dec2Bin  2039               M00_RatioBits2RatioDecs  2040   M00_RatioDecs2RatioBits  2041
+ M00_Bytes2Decimals  2042        M00_Decimals2Bytes  2043        M00_Words2Decimals  2044
+ M00_Decimals2Words  2045        M00_Dwords2Decimals  2046       M00_Decimals2Dwords  2047
+ M00_Qwords2Decimals  2048       M00_Decimals2Qwords  2049       M00_Owords2Decimals  2050
+ M00_Decimals2Owords  2051       M00_Base24Encode  2052          M00_Base24Decode  2053
+ M00_Base41Encode  2054          M00_Base41Decode  2055          M00_Base53Encode  2056
+ M00_Base53Decode  2057          M00_Base64Encode  2058          M00_Base64Decode  2059
+ M00_Base75Encode  2060          M00_Base75Decode  2061          M00_Base85Encode  2062
+ M00_Base85Decode  2063          M00_Base94Encode  2064          M00_Base94Decode  2065
+ M00_Base62Encode  2066          M00_Base62Decode  2067          M00_AnyBitsADD  2068
+ M00_AnyBitsADD32  2069          M00_AnyBitsSUB  2070            M00_AnyBitsSUB32  2071
+ M00_AnyBitsNEG  2072            M00_AnyBitsNOT  2073            M00_AnyBitsMULbin  2074
+ M00_AnyBitsMUL  2075            M00_AnyBitsMUL32  2076          M00_AnyBitsSQ2  2077
+ M00_AnyBitsPOW  2078            M00_AnyBitsDIV  2079            M00_AnyBitsDIV32  2080
+ M00_AnyBitsMOD  2081            M00_AnyBitsGCD  2082            M00_AnyBitsMOD32  2083
+ M00_AnyBitsSQRoot  2084         M00_AnyBitsNRoot  2085          M00_AnyBitsSHL  2086
+ M00_AnyBitsSHR  2087            M00_AnyBitsROL  2088            M00_AnyBitsROR  2089
+ M00_AnyBitsFLTPrPtest  2090     M00_TestFunc0  2091             M00_TestFunc1  2092
+ M00_TestFunc2  2093             M00_TestFunc3  2094             M00_TestFunc4  2095
+ M00_TestFunc5  2096             M00_TestFunc6  2097             M00_TestFunc7  2098
+ M00_TestFunc8  2099             M00_TestFunc9  2100             M00_About  2101]
 ___________________________________________________________________________________________
 
 Proc MainWindowProc:
@@ -503,6 +503,10 @@ L0:
                call OnBin2Hex
             Else_If  D@wParam = M00_Hex2Bin
                call OnHex2Bin
+            Else_If  D@wParam = M00_AnyBits2HexA
+               call OnAnyBits2HexA
+            Else_If  D@wParam = M00_HexA2AnyBits
+               call OnHexA2AnyBits
             Else_If  D@wParam = M00_Bin2HexBytes
                call OnBin2HexBytes
             Else_If  D@wParam = M00_HexBytes2Bin
@@ -1120,6 +1124,38 @@ Proc OnHex2Bin:
 
     call 'BaseCodecs.BaseHexA2BinaryDecode' D@outMem D@inMem D@inSz | mov D@outSz eax
 
+    call ChooseAndSaveFileA D@outMem D@outSz
+@BM:
+    call VFree D@outMem | call VFree D@inMem
+EndP
+;
+;
+Proc OnAnyBits2HexA:
+ cLocal @outSz @outMem @inSz @inMem
+
+    call ChooseAndLoadFileA | test eax eax | je P9>
+    mov D@inMem eax, D@inSz edx
+    ALIGN_ON 4 edx | shl edx 1
+    mov D@outSz edx
+    call VAlloc D@outSz | mov D@outMem eax | test eax eax | je @BM
+    mov eax D@inSz | SHL eax 3| ALIGN_ON 32 eax
+    call 'BaseCodecs.AnyBits2HexA' D@outMem D@inMem eax | test eax eax | je @BM
+    mov D@outSz eax
+    call ChooseAndSaveFileA D@outMem D@outSz
+@BM:
+    call VFree D@outMem | call VFree D@inMem
+EndP
+;
+Proc OnHexA2AnyBits:
+ cLocal @outSz @outMem @inSz @inMem
+
+    call ChooseAndLoadFileA | test eax eax | je P9>
+    mov D@inMem eax, D@inSz edx
+    shr edx 1 | ALIGN_ON 4 edx
+    mov D@outSz edx
+    call VAlloc D@outSz | mov D@outMem eax | test eax eax | je @BM
+    call 'BaseCodecs.BaseHex2iBinaryDecode' D@outMem D@outSz D@inMem D@inSz | test eax eax | je @BM
+    mov D@outSz eax
     call ChooseAndSaveFileA D@outMem D@outSz
 @BM:
     call VFree D@outMem | call VFree D@inMem
